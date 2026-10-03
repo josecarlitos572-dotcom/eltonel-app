@@ -1,0 +1,64 @@
+plugins { // REM: Plugins de construcción
+    id "com.android.application" // REM: Plugin aplicación Android
+    id "kotlin-android" // REM: Soporte lenguaje Kotlin
+    id "dev.flutter.flutter-gradle-plugin" // REM: Plugin oficial Flutter
+}
+
+def localProperties = new Properties() // REM: Carga propiedades locales
+def localPropertiesFile = rootProject.file('local.properties') // REM: Ruta archivo
+if (localPropertiesFile.exists()) { // REM: Si existe
+    localPropertiesFile.withReader('UTF-8') { reader -> // REM: Lee UTF-8
+        localProperties.load(reader) // REM: Carga datos
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode') // REM: Versión código
+if (flutterVersionCode == null) { // REM: Si nula
+    flutterVersionCode = '1' // REM: Default 1
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName') // REM: Versión nombre
+if (flutterVersionName == null) { // REM: Si nula
+    flutterVersionName = '1.0' // REM: Default 1.0
+}
+
+android { // REM: Configuración Android
+    namespace "com.eltonel.app" // REM: ID único paquete
+    compileSdkVersion flutter.compileSdkVersion // REM: SDK Flutter
+    ndkVersion flutter.ndkVersion // REM: NDK Flutter
+
+    compileOptions { // REM: Opciones Java
+        sourceCompatibility JavaVersion.VERSION_1_8 // REM: Fuente Java 8
+        targetCompatibility JavaVersion.VERSION_1_8 // REM: Target Java 8
+    }
+
+    kotlinOptions { // REM: Opciones Kotlin
+        jvmTarget = '1.8' // REM: Target JVM 1.8
+    }
+
+    sourceSets { // REM: Fuentes
+        main.java.srcDirs += 'src/main/kotlin' // REM: Dir Kotlin
+    }
+
+    defaultConfig { // REM: Config defecto
+        applicationId "com.eltonel.app" // REM: ID App
+        minSdkVersion flutter.minSdkVersion // REM: Min SDK
+        targetSdkVersion flutter.targetSdkVersion // REM: Target SDK
+        versionCode flutterVersionCode.toInteger() // REM: Código entero
+        versionName flutterVersionName // REM: Nombre versión
+    }
+
+    buildTypes { // REM: Tipos build
+        release { // REM: Liberación
+            signingConfig signingConfigs.debug // REM: Firma debug temporal
+        }
+    }
+}
+
+flutter { // REM: Config Flutter
+    source '../..' // REM: Origen código
+}
+
+dependencies { // REM: Dependencias nativas
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version" // REM: Lib Kotlin
+}
