@@ -1,64 +1,61 @@
-plugins { // REM: Plugins de construcción
-    id "com.android.application" // REM: Plugin aplicación Android
-    id "kotlin-android" // REM: Soporte lenguaje Kotlin
-    id "dev.flutter.flutter-gradle-plugin" // REM: Plugin oficial Flutter
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
 }
 
-def localProperties = new Properties() // REM: Carga propiedades locales
-def localPropertiesFile = rootProject.file('local.properties') // REM: Ruta archivo
-if (localPropertiesFile.exists()) { // REM: Si existe
-    localPropertiesFile.withReader('UTF-8') { reader -> // REM: Lee UTF-8
-        localProperties.load(reader) // REM: Carga datos
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
     }
 }
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode') // REM: Versión código
-if (flutterVersionCode == null) { // REM: Si nula
-    flutterVersionCode = '1' // REM: Default 1
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
 }
 
-def flutterVersionName = localProperties.getProperty('flutter.versionName') // REM: Versión nombre
-if (flutterVersionName == null) { // REM: Si nula
-    flutterVersionName = '1.0' // REM: Default 1.0
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
 }
 
-android { // REM: Configuración Android
-    namespace "com.eltonel.app" // REM: ID único paquete
-    compileSdkVersion flutter.compileSdkVersion // REM: SDK Flutter
-    ndkVersion flutter.ndkVersion // REM: NDK Flutter
+android {
+    namespace "com.eltonel.app"
+    compileSdk 34
 
-    compileOptions { // REM: Opciones Java
-        sourceCompatibility JavaVersion.VERSION_1_8 // REM: Fuente Java 8
-        targetCompatibility JavaVersion.VERSION_1_8 // REM: Target Java 8
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions { // REM: Opciones Kotlin
-        jvmTarget = '1.8' // REM: Target JVM 1.8
+    kotlinOptions {
+        jvmTarget = '1.8'
     }
 
-    sourceSets { // REM: Fuentes
-        main.java.srcDirs += 'src/main/kotlin' // REM: Dir Kotlin
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
     }
 
-    defaultConfig { // REM: Config defecto
-        applicationId "com.eltonel.app" // REM: ID App
-        minSdkVersion flutter.minSdkVersion // REM: Min SDK
-        targetSdkVersion flutter.targetSdkVersion // REM: Target SDK
-        versionCode flutterVersionCode.toInteger() // REM: Código entero
-        versionName flutterVersionName // REM: Nombre versión
+    defaultConfig {
+        applicationId "com.eltonel.app"
+        minSdk 21
+        targetSdk 34
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
     }
 
-    buildTypes { // REM: Tipos build
-        release { // REM: Liberación
-            signingConfig signingConfigs.debug // REM: Firma debug temporal
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
         }
     }
 }
 
-flutter { // REM: Config Flutter
-    source '../..' // REM: Origen código
+flutter {
+    source '../..'
 }
 
-dependencies { // REM: Dependencias nativas
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version" // REM: Lib Kotlin
-}
+dependencies {}
