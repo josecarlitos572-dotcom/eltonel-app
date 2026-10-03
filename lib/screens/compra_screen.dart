@@ -27,7 +27,9 @@ class _CompraScreenState extends State<CompraScreen> { // REM: Lógica interna d
     var cats = await db.query('categorias_gasto', where: 'activo = 1'); // REM: Consulta solo categorías activas
     setState(() { // REM: Actualiza el estado con las categorías
       _categorias = cats; // REM: Guarda la lista de categorías
-      if (cats.isNotEmpty) _categoriaId = cats.first['id']; // REM: Selecciona la primera categoría por defecto
+      if (cats.isNotEmpty) { // REM: Si hay categorías disponibles
+        _categoriaId = cats.first['id'] as int; // REM: Casteo explícito a int para evitar error de tipos
+      }
     });
   }
 
@@ -37,7 +39,7 @@ class _CompraScreenState extends State<CompraScreen> { // REM: Lógica interna d
     double monto = double.tryParse(_montoCtrl.text) ?? 0; // REM: Convierte el texto a número decimal
     
     var catSeleccionada = _categorias.firstWhere((c) => c['id'] == _categoriaId); // REM: Busca la categoría seleccionada
-    double limite = (catSeleccionada['limite_max'] as num).toDouble(); // REM: Obtiene el límite máximo permitido para esa categoría
+    double limite = (catSeleccionada['limite_max'] as num?)?.toDouble() ?? 0.0; // REM: Convierte el límite a double con protección contra null
     
     if (monto > limite) { // REM: Valida que el monto no exceda el límite parametrizado
       ScaffoldMessenger.of(context).showSnackBar( // REM: Muestra mensaje de error
@@ -49,7 +51,7 @@ class _CompraScreenState extends State<CompraScreen> { // REM: Lógica interna d
     final dbHelper = Provider.of<DatabaseHelper>(context, listen: false); // REM: Obtiene servicio de base de datos
     final auth = Provider.of<AuthService>(context, listen: false); // REM: Obtiene servicio de autenticación
     
-    String nombreCategoria = catSeleccionada['nombre']; // REM: Obtiene el nombre real de la categoría
+    String nombreCategoria = catSeleccionada['nombre'] as String; // REM: Casteo explícito a String
 
     await dbHelper.registrarGasto(nombreCategoria, _descCtrl.text, monto, tieneComprobante); // REM: Guarda el gasto en la base de datos
     
@@ -70,7 +72,10 @@ class _CompraScreenState extends State<CompraScreen> { // REM: Lógica interna d
               value: _categoriaId, // REM: Valor actualmente seleccionado
               dropdownColor: Colors.black, // REM: Color de fondo del menú desplegable
               style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'), // REM: Estilo de texto blanco Courier
-              items: _categorias.map((val) => DropdownMenuItem(value: val['id'], child: Text(val['nombre']))).toList(), // REM: Genera las opciones desde la lista de categorías
+              items: _categorias.map<DropdownMenuItem<int>>((val) => DropdownMenuItem<int>( // REM: Tipado explícito del map
+                value: val['id'] as int, // REM: Casteo del id a int
+                child: Text(val['nombre'] as String), // REM: Casteo del nombre a String
+              )).toList(), // REM: Convierte el iterable a lista
               onChanged: (val) => setState(() => _categoriaId = val!), // REM: Actualiza la categoría seleccionada
             ),
             SizedBox(height: 20), // REM: Espacio vertical de 20 píxeles
