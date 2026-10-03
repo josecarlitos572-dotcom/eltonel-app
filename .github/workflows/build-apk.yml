@@ -1,0 +1,40 @@
+name: Build Flutter APK # REM: Nombre del proceso de automatización
+
+on:
+  push:
+    branches:
+      - main # REM: Se ejecuta cada vez que guarda cambios en la rama principal
+  workflow_dispatch: # REM: Permite ejecutarlo manualmente desde la pestaña "Actions"
+
+jobs:
+  build:
+    name: Compilar APK en la Nube
+    runs-on: ubuntu-latest # REM: Usa un servidor Linux de GitHub
+
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v3 # REM: Descarga tu código
+
+      - name: Configurar Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11' # REM: Versión de Java requerida por Flutter
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0' # REM: Versión estable de Flutter
+          channel: 'stable'
+
+      - name: Instalar Dependencias
+        run: flutter pub get # REM: Descarga las librerías del pubspec.yaml
+
+      - name: Compilar APK de Producción
+        run: flutter build apk --release # REM: Genera el archivo APK final
+
+      - name: Subir APK como Artefacto
+        uses: actions/upload-artifact@v3
+        with:
+          name: eltonel-app-release # REM: Nombre del archivo a descargar
+          path: build/app/outputs/flutter-apk/app-release.apk # REM: Ruta donde se guarda
