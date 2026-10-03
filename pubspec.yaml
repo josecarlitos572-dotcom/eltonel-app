@@ -24,3 +24,15 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: CourierNew
+      fonts:
+        - asset: fonts/Courier_New_Regular.ttf
+        - asset: fonts/Courier_New_Bold.ttf
+          weight: 700
+        - asset: fonts/Courier_New_Italic.ttf
+          style: italic
+        - asset: fonts/Courier_New_Bold_Italic.ttf
+          weight: 700
+          style: italic
