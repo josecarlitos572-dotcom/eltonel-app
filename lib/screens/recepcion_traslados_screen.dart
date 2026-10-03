@@ -42,8 +42,8 @@ class _RecepcionTrasladosScreenState extends State<RecepcionTrasladosScreen> { /
 
         await db.transaction((txn) async { // REM: Inicia una transacción de base de datos segura (todo o nada)
           for (var item in data['items']) { // REM: Itera sobre cada producto listado en el archivo JSON
-            int prodId = item['producto_id']; // REM: Extrae el ID del producto
-            int qty = item['cantidad']; // REM: Extrae la cantidad a recibir
+            int prodId = item['producto_id'] as int; // REM: Extrae el ID del producto con casteo seguro
+            int qty = item['cantidad'] as int; // REM: Extrae la cantidad a recibir con casteo seguro
 
             var existing = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, myPvId, hoy]); // REM: Busca si ya existe registro de inventario para hoy
 
@@ -104,4 +104,13 @@ class _RecepcionTrasladosScreenState extends State<RecepcionTrasladosScreen> { /
               onPressed: _procesarArchivo, // REM: Ejecuta la función de procesamiento al presionar
               child: Text('CARGAR Y ACTUALIZAR STOCK'), // REM: Texto del botón
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow, // REM
+                backgroundColor: Colors.yellow, // REM: Fondo amarillo
+                minimumSize: Size(double.infinity, 50) // REM: Ancho completo, alto 50
+              )
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
