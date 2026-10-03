@@ -18,7 +18,7 @@ jobs:
       - name: Configurar Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin' # CAMBIO: Zulu -> Temurin (más estable para Flutter)
           java-version: '17'
 
       - name: Configurar Flutter
@@ -26,6 +26,10 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
+          cache: true # NUEVO: Acelera compilaciones futuras
+
+      - name: Limpiar proyecto
+        run: flutter clean # NUEVO: Evita conflictos de caché previos
 
       - name: Instalar Dependencias
         run: flutter pub get
