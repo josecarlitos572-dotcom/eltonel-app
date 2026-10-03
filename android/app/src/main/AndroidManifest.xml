@@ -1,0 +1,37 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"> <!-- REM: Raíz manifiesto -->
+    
+    <!-- REM: Permiso leer almacenamiento externo (para recibir JSON) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/> 
+    <!-- REM: Permiso escribir almacenamiento externo (para enviar JSON) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/> 
+    <!-- REM: Permiso internet (para WhatsApp y actualizaciones) -->
+    <uses-permission android:name="android.permission.INTERNET"/> 
+
+    <application
+        android:label="eltonel_full" // REM: Nombre visible app
+        android:name="${applicationName}" // REM: Clase aplicación
+        android:icon="@mipmap/ic_launcher"> // REM: Icono app
+        
+        <activity
+            android:name=".MainActivity" // REM: Actividad principal
+            android:exported="true" // REM: Visible externamente
+            android:launchMode="singleTop" // REM: Modo lanzamiento
+            android:theme="@style/LaunchTheme" // REM: Tema inicio
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" // REM: Cambios config
+            android:hardwareAccelerated="true" // REM: Aceleración HW
+            android:windowSoftInputMode="adjustResize"> // REM: Teclado
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme" // REM: Tema normal
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/> // REM: Punto entrada
+                <category android:name="android.intent.category.LAUNCHER"/> // REM: Lanzador
+            </intent-filter>
+        </activity>
+        
+        <meta-data
+            android:name="flutterEmbedding" // REM: Integración Flutter
+            android:value="2" /> // REM: Versión 2
+    </application>
+</manifest>
