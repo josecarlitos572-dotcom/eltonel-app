@@ -1,28 +1,30 @@
-name: eltonel_full
-description: Sistema de Gestión Interna Desayunos El Tonel
-version: 2.0.0+1
+name: eltonel_full // REM: Nombre único del proyecto
+description: Sistema Desayunos El Tonel - Version Troglodita // REM: Descripción operativa
+version: 3.0.0+1 // REM: Versión final integrada
 
-environment:
-  sdk: ">=2.19.0 <4.0.0"
+environment: // REM: Configuración del entorno de desarrollo
+  sdk: ">=2.19.0 <4.0.0" // REM: Rango de versiones de Dart compatibles
 
-dependencies:
-  flutter:
-    sdk: flutter
-  sqflite: ^2.3.0
-  path: ^1.8.3
-  provider: ^6.0.5
-  intl: ^0.18.1
+dependencies: // REM: Librerías necesarias para producción
+  flutter: // REM: Framework principal de Google
+    sdk: flutter // REM: Indica que viene del SDK instalado
+  sqflite: ^2.3.0 // REM: Base de datos SQLite local
+  path: ^1.8.3 // REM: Utilidad para manejar rutas de archivos
+  provider: ^6.0.5 // REM: Gestión de estado para compartir datos
+  intl: ^0.18.1 // REM: Formato internacional de fechas y números
+  url_launcher: ^6.1.11 // REM: Permite abrir enlaces externos (WhatsApp)
+  file_picker: ^5.3.1 // REM: Permite seleccionar archivos del celular (JSON)
+  share_plus: ^7.1.0 // REM: Permite compartir archivos o texto
+  path_provider: ^2.0.15 // REM: Encuentra carpetas del sistema para guardar
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^2.0.0
+dev_dependencies: // REM: Librerías solo para desarrollo
+  flutter_test: // REM: Framework de pruebas
+    sdk: flutter // REM: Viene del SDK
+  flutter_lints: ^2.0.0 // REM: Reglas de estilo y buenas prácticas
 
-flutter:
-  uses-material-design: true
-  assets:
-    - assets/fonts/courier_new.ttf
-  fonts:
-    - family: CourierNew
-      fonts:
-        - asset: assets/fonts/courier_new.ttf
+flutter: // REM: Configuración específica de recursos
+  uses-material-design: true // REM: Activa iconos y temas Material Design
+  fonts: // REM: Definición de fuentes personalizadas
+    - family: CourierNew // REM: Nombre de la familia de fuente
+      fonts: // REM: Lista de archivos de fuente
+        - asset: assets/fonts/courier_new.ttf // REM: Ruta al archivo .ttf
