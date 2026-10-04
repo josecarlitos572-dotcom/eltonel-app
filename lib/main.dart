@@ -98,7 +98,7 @@ class InactivityWrapper extends StatefulWidget { // REM: Widget que detecta falt
 }
 
 class _InactivityWrapperState extends State<InactivityWrapper> { // REM: Lógica de detección de inactividad
-  late Timer _timer; // REM: Temporizador que cuenta el tiempo sin interacción
+  Timer? _timer; // ✅ CAMBIO 3: Nullable en vez de "late" (evita LateInitializationError)
   
   @override
   void initState() { // REM: Se ejecuta al montar el widget
@@ -107,7 +107,7 @@ class _InactivityWrapperState extends State<InactivityWrapper> { // REM: Lógica
   }
 
   void _resetTimer() { // REM: Reinicia el conteo de 5 minutos
-    _timer?.cancel(); // REM: Cancela cualquier temporizador previo activo
+    _timer?.cancel(); // REM: Cancela cualquier temporizador previo activo (si existe)
     _timer = Timer(Duration(minutes: 5), () { // REM: Programa nuevo timer de 5 min
       if (mounted) { // REM: Verifica que el widget siga existiendo en pantalla
         final auth = Provider.of<AuthService>(context, listen: false); // REM: Obtiene servicio Auth sin escuchar cambios
@@ -128,7 +128,7 @@ class _InactivityWrapperState extends State<InactivityWrapper> { // REM: Lógica
 
   @override
   void dispose() { // REM: Limpieza al destruir el widget
-    _timer.cancel(); // REM: Detiene el timer para evitar fugas de memoria
+    _timer?.cancel(); // REM: Detiene el timer (con ?. por si aún no se ha creado)
     super.dispose(); // REM: Llama al dispose del padre
   }
 }
