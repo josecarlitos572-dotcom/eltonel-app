@@ -6,11 +6,32 @@ import 'services/auth_service.dart'; // REM: Servicio de autenticación de usuar
 import 'screens/login_screen.dart'; // REM: Pantalla inicial de acceso
 
 void main() { // REM: Punto de entrada absoluto de la aplicación
+  // ✅ CAMBIO 1: Forzar a Flutter a mostrar el error en pantalla (modo release)
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.red,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Text(
+              'ERROR DETECTADO:\n\n${details.exception}\n\n${details.stack ?? ""}',
+              style: TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp( // REM: Inicia el árbol de widgets de Flutter
     MultiProvider( // REM: Contenedor que provee servicios a toda la app
       providers: [ // REM: Lista de servicios disponibles globalmente
         ChangeNotifierProvider(create: (_) => DatabaseHelper()), // REM: Instancia única de Base de Datos
-        ChangeNotifierProvider(create: (_) => AuthService(DatabaseHelper())), // REM: Instancia de Auth vinculada a DB
+        // ✅ CAMBIO 2: Reusar la MISMA instancia de DatabaseHelper en AuthService
+        ChangeNotifierProvider(
+          create: (context) => AuthService(context.read<DatabaseHelper>()),
+        ),
       ],
       child: ElTonelApp(), // REM: Widget raíz de la aplicación
     ),
