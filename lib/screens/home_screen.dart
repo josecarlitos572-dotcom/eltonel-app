@@ -1,34 +1,31 @@
-import 'package:flutter/material.dart'; // REM: Librería principal de interfaz gráfica
-import 'package:provider/provider.dart'; // REM: Gestor de estado para acceder a servicios
-import '../services/auth_service.dart'; // REM: Servicio de autenticación para leer rol del usuario
-import 'venta_screen.dart'; // REM: Pantalla de ventas (accesible para todos)
-import 'transferencia_screen.dart'; // REM: Pantalla de envío de stock (solo admin)
-import 'recepcion_traslados_screen.dart'; // REM: Pantalla de recepción de stock y cambio inicial
-import 'cierre_caja_screen.dart'; // REM: Pantalla de cierre de jornada (solo admin)
-import 'rentabilidad_screen.dart'; // REM: Pantalla de reporte de ganancias (solo admin)
-import 'cxc_screen.dart'; // REM: Pantalla de cuentas por cobrar (solo admin)
-import 'admin_personal_screen.dart'; // REM: Pantalla de gestión de personal (solo admin)
-import 'compra_screen.dart'; // REM: Pantalla de registro de gastos (solo admin)
-import 'mantenimiento/mantenimiento_menu_screen.dart'; // REM: NUEVO - Menú de mantenimiento (solo admin)
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import 'venta_screen.dart';
+import 'transferencia_screen.dart';
+import 'recepcion_traslados_screen.dart';
+import 'cierre_caja_screen.dart';
+import 'rentabilidad_screen.dart';
+import 'cxc_screen.dart';
+import 'admin_personal_screen.dart';
+import 'compra_screen.dart';
+import 'mantenimiento/mantenimiento_menu_screen.dart';
 
-class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal sin estado mutable
+class HomeScreen extends StatelessWidget {
   @override
-  Widget build(BuildContext context) { // REM: Construye la interfaz visual
-    final auth = Provider.of<AuthService>(context); // REM: Obtiene el servicio de autenticación
-    bool isAdmin = auth.currentUser?['rol'] == 'admin'; // REM: Verifica si el usuario tiene rol de administrador
-    
-    return Scaffold( // REM: Estructura básica de la pantalla
-      appBar: AppBar( // REM: Barra superior de la aplicación
-        title: Text('MENÚ PRINCIPAL'), // REM: Título de la barra
-        backgroundColor: Colors.black, // REM: Fondo negro de la barra
+  Widget build(BuildContext context) {
+    final auth = Provider.of<AuthService>(context);
+    bool isAdmin = auth.currentUser?['rol'] == 'admin';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('MENÚ PRINCIPAL'),
+        backgroundColor: Colors.black,
       ),
-      backgroundColor: Colors.black, // REM: Fondo negro de toda la pantalla
-      body: SingleChildScrollView( // REM: Permite scroll si hay muchos botones
-        child: Column( // REM: Organiza el contenido en columna
+      backgroundColor: Colors.black,
+      body: SingleChildScrollView(
+        child: Column(
           children: [
-            // ═══════════════════════════════════════════════════
-            // BOTÓN DESTACADO: MANTENIMIENTO (solo admin)
-            // ═══════════════════════════════════════════════════
             if (isAdmin)
               Padding(
                 padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
@@ -61,9 +58,6 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
                   ),
                 ),
               ),
-            // ═══════════════════════════════════════════════════
-            // GRID DE BOTONES ORIGINALES
-            // ═══════════════════════════════════════════════════
             GridView.count(
               crossAxisCount: 2,
               padding: EdgeInsets.all(15),
@@ -73,7 +67,6 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
               physics: NeverScrollableScrollPhysics(),
               children: [
                 _btn(context, 'NUEVA VENTA', VentaScreen()),
-                
                 if (isAdmin) ...[
                   _btn(context, 'ENVIAR STOCK', TransferenciaScreen()),
                   _btn(context, 'GESTIÓN PERSONAL', AdminPersonalScreen()),
@@ -82,9 +75,7 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
                   _btn(context, 'CUENTAS X COBRAR', CxcScreen()),
                   _btn(context, 'REGISTRAR GASTO', CompraScreen()),
                 ],
-                
                 _btn(context, 'RECIBIR INICIO JORNADA', RecepcionTrasladosScreen()),
-                
                 ElevatedButton(
                   onPressed: () {
                     auth.logout();
@@ -104,7 +95,7 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
     );
   }
 
-  Widget _btn(BuildContext ctx, String title, Widget screen) { // REM: Función auxiliar para botones uniformes
+  Widget _btn(BuildContext ctx, String title, Widget screen) {
     return ElevatedButton(
       child: Text(
         title,
