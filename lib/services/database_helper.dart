@@ -17,7 +17,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), 'eltonel.db');
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -404,9 +404,22 @@ class DatabaseHelper extends ChangeNotifier {
         datos_anteriores TEXT,
         datos_nuevos TEXT
       )''');
-      // Actualizar orden de categorías
       await db.rawUpdate('UPDATE categorias_producto SET orden = id');
       await db.rawUpdate('UPDATE puntos_venta SET direccion = ""');
+    }
+    if (oldVersion < 10) {
+      await db.update(
+        'categorias_gasto',
+        {'limite_max': 2.0},
+        where: 'nombre = ?',
+        whereArgs: ['SS.HH.'],
+      );
+      await db.update(
+        'parametros',
+        {'valor': '10'},
+        where: 'clave = ?',
+        whereArgs: ['version_bd'],
+      );
     }
   }
 
@@ -416,7 +429,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('puntos_venta', {'id': 3, 'nombre': 'Víctor Raúl 1', 'codigo': 'VR1', 'direccion': ''});
     await db.insert('puntos_venta', {'id': 4, 'nombre': 'Víctor Raúl 2', 'codigo': 'VR2', 'direccion': ''});
 
-    await db.insert('categorias_gasto', {'nombre': 'SS.HH.', 'limite_max': 9999});
+    await db.insert('categorias_gasto', {'nombre': 'SS.HH.', 'limite_max': 2.0});
     await db.insert('categorias_gasto', {'nombre': 'Flete Llegada', 'limite_max': 6});
     await db.insert('categorias_gasto', {'nombre': 'Flete Salida', 'limite_max': 6});
     await db.insert('categorias_gasto', {'nombre': 'Flete Movimiento', 'limite_max': 9});
@@ -447,7 +460,7 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'admin_whatsapp', 'valor': '51999999999', 'descripcion': 'WhatsApp del admin'},
       {'clave': 'hora_cierre', 'valor': '18:00', 'descripcion': 'Hora sugerida de cierre'},
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
-      {'clave': 'version_bd', 'valor': '9', 'descripcion': 'Versión actual de la BD'},
+      {'clave': 'version_bd', 'valor': '10', 'descripcion': 'Versión actual de la BD'},
     ];
     for (var p in params) {
       await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -546,9 +559,6 @@ class DatabaseHelper extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  CRUD GENÉRICO
-  // ═══════════════════════════════════════════════════════════
   Future<int> insertar(String tabla, Map<String, dynamic> data) async {
     final db = await database;
     return await db.insert(tabla, data);
@@ -575,9 +585,6 @@ class DatabaseHelper extends ChangeNotifier {
     return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  CONSULTAS ESPECÍFICAS
-  // ═══════════════════════════════════════════════════════════
   Future<List<Map<String, dynamic>>> getProductos() async {
     final db = await database;
     return await db.rawQuery('''
@@ -596,6 +603,11 @@ class DatabaseHelper extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> getPuntosVenta() async {
     final db = await database;
     return await db.query('puntos_venta', orderBy: 'id ASC');
+  }
+
+  Future<List<Map<String, dynamic>>> getCategoriasGasto() async {
+    final db = await database;
+    return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC');
   }
 
   Future<String?> getParametro(String clave) async {
