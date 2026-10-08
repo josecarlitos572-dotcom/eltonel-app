@@ -17,77 +17,48 @@ class HomeScreen extends StatelessWidget {
     final auth = Provider.of<AuthService>(context);
     bool isAdmin = auth.currentUser?['rol'] == 'admin';
 
+    // Lista de botones según rol
+    final List<Map<String, dynamic>> botones = [
+      {'titulo': 'NUEVA VENTA', 'screen': VentaScreen()},
+      if (isAdmin) ...[
+        {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
+        {'titulo': 'GESTIÓN PERSONAL', 'screen': AdminPersonalScreen()},
+        {'titulo': 'CIERRE DE CAJA', 'screen': CierreCajaScreen()},
+        {'titulo': 'MI RENTABILIDAD', 'screen': RentabilidadScreen()},
+        {'titulo': 'CUENTAS X COBRAR', 'screen': CxcScreen()},
+        {'titulo': 'REGISTRAR GASTO', 'screen': CompraScreen()},
+        {'titulo': 'MANTENIMIENTO', 'screen': MantenimientoMenuScreen()},
+      ],
+      {'titulo': 'RECIBIR INICIO JORNADA', 'screen': RecepcionTrasladosScreen()},
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: Text('MENÚ PRINCIPAL'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
-      body: SingleChildScrollView(
+      body: Padding(
+        padding: EdgeInsets.all(8),
         child: Column(
           children: [
-            if (isAdmin)
-              Padding(
-                padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 70,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MantenimientoMenuScreen(),
-                      ),
-                    ),
-                    icon: Icon(Icons.build, color: Colors.black, size: 32),
-                    label: Text(
-                      'MANTENIMIENTO',
-                      style: TextStyle(
-                        fontFamily: 'CourierNew',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            GridView.count(
-              crossAxisCount: 2,
-              padding: EdgeInsets.all(15),
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              children: [
-                _btn(context, 'NUEVA VENTA', VentaScreen()),
-                if (isAdmin) ...[
-                  _btn(context, 'ENVIAR STOCK', TransferenciaScreen()),
-                  _btn(context, 'GESTIÓN PERSONAL', AdminPersonalScreen()),
-                  _btn(context, 'CIERRE DE CAJA', CierreCajaScreen()),
-                  _btn(context, 'MI RENTABILIDAD', RentabilidadScreen()),
-                  _btn(context, 'CUENTAS X COBRAR', CxcScreen()),
-                  _btn(context, 'REGISTRAR GASTO', CompraScreen()),
+            // GRID DE BOTONES
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1.15,
+                children: [
+                  ...botones.map((b) => _btnCuadrado(
+                    context,
+                    b['titulo'] as String,
+                    b['screen'] as Widget,
+                  )),
+                  // Botón SALIR al final
+                  _btnSalir(context, auth),
                 ],
-                _btn(context, 'RECIBIR INICIO JORNADA', RecepcionTrasladosScreen()),
-                ElevatedButton(
-                  onPressed: () {
-                    auth.logout();
-                    Navigator.pushReplacementNamed(context, '/');
-                  },
-                  child: Text(
-                    'SALIR',
-                    style: TextStyle(fontFamily: 'CourierNew', fontSize: 14),
-                  ),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                ),
-              ],
+              ),
             ),
           ],
         ),
@@ -95,14 +66,71 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _btn(BuildContext ctx, String title, Widget screen) {
-    return ElevatedButton(
-      child: Text(
-        title,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontFamily: 'CourierNew', fontSize: 14),
+  /// Botón cuadrado con borde negro sólido
+  Widget _btnCuadrado(BuildContext ctx, String titulo, Widget screen) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.yellow,
+        border: Border.all(color: Colors.black, width: 3),
       ),
-      onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => screen)),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            ctx,
+            MaterialPageRoute(builder: (_) => screen),
+          ),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(6),
+              child: Text(
+                titulo,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.black,
+                  fontFamily: 'CourierNew',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Botón SALIR cuadrado
+  Widget _btnSalir(BuildContext ctx, AuthService auth) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.red,
+        border: Border.all(color: Colors.black, width: 3),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            auth.logout();
+            Navigator.pushReplacementNamed(ctx, '/');
+          },
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(6),
+              child: Text(
+                'SALIR',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'CourierNew',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
