@@ -23,27 +23,27 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
         backgroundColor: Colors.black, // REM: Fondo negro de la barra
       ),
       backgroundColor: Colors.black, // REM: Fondo negro de toda la pantalla
-      body: SingleChildScrollView( // REM: NUEVO - Permite scroll si hay muchos botones
-        child: Column( // REM: NUEVO - Organiza el contenido en columna
+      body: SingleChildScrollView( // REM: Permite scroll si hay muchos botones
+        child: Column( // REM: Organiza el contenido en columna
           children: [
             // ═══════════════════════════════════════════════════
             // BOTÓN DESTACADO: MANTENIMIENTO (solo admin)
             // ═══════════════════════════════════════════════════
             if (isAdmin)
-              Padding( // REM: Margen alrededor del botón
-                padding: EdgeInsets.fromLTRB(15, 15, 15, 0), // REM: Izq, arriba, der, abajo
-                child: SizedBox( // REM: Contenedor con tamaño definido
-                  width: double.infinity, // REM: Ancho completo
-                  height: 70, // REM: Alto destacado
-                  child: ElevatedButton.icon( // REM: Botón con ícono
-                    onPressed: () => Navigator.push( // REM: Al presionar navega a mantenimiento
+              Padding(
+                padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 70,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => MantenimientoMenuScreen(),
                       ),
                     ),
-                    icon: Icon(Icons.build, color: Colors.black, size: 32), // REM: Ícono de herramienta
-                    label: Text( // REM: Texto del botón
+                    icon: Icon(Icons.build, color: Colors.black, size: 32),
+                    label: Text(
                       'MANTENIMIENTO',
                       style: TextStyle(
                         fontFamily: 'CourierNew',
@@ -51,10 +51,10 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
                         fontSize: 20,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom( // REM: Estilo especial
-                      backgroundColor: Colors.orange, // REM: Naranja para destacarlo
-                      foregroundColor: Colors.black, // REM: Texto negro
-                      shape: RoundedRectangleBorder( // REM: Bordes redondeados
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
@@ -64,17 +64,17 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
             // ═══════════════════════════════════════════════════
             // GRID DE BOTONES ORIGINALES
             // ═══════════════════════════════════════════════════
-            GridView.count( // REM: Cuadrícula de botones
-              crossAxisCount: 2, // REM: Dos columnas
-              padding: EdgeInsets.all(15), // REM: Margen interno
-              crossAxisSpacing: 15, // REM: Espacio horizontal
-              mainAxisSpacing: 15, // REM: Espacio vertical
-              shrinkWrap: true, // REM: NUEVO - Permite anidar en Column
-              physics: NeverScrollableScrollPhysics(), // REM: NUEVO - Desactiva scroll propio
+            GridView.count(
+              crossAxisCount: 2,
+              padding: EdgeInsets.all(15),
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
               children: [
-                _btn(context, 'NUEVA VENTA', VentaScreen()), // REM: Botón de venta
+                _btn(context, 'NUEVA VENTA', VentaScreen()),
                 
-                if (isAdmin) ...[ // REM: Botones solo para admin
+                if (isAdmin) ...[
                   _btn(context, 'ENVIAR STOCK', TransferenciaScreen()),
                   _btn(context, 'GESTIÓN PERSONAL', AdminPersonalScreen()),
                   _btn(context, 'CIERRE DE CAJA', CierreCajaScreen()),
@@ -85,12 +85,15 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
                 
                 _btn(context, 'RECIBIR INICIO JORNADA', RecepcionTrasladosScreen()),
                 
-                ElevatedButton( // REM: Botón de salir
+                ElevatedButton(
                   onPressed: () {
                     auth.logout();
                     Navigator.pushReplacementNamed(context, '/');
                   },
-                  child: Text('SALIR', style: TextStyle(fontFamily: 'CourierNew', fontSize: 14)),
+                  child: Text(
+                    'SALIR',
+                    style: TextStyle(fontFamily: 'CourierNew', fontSize: 14),
+                  ),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 ),
               ],
@@ -102,13 +105,13 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
   }
 
   Widget _btn(BuildContext ctx, String title, Widget screen) { // REM: Función auxiliar para botones uniformes
-    return ElevatedButton( // REM: Botón elevado
-      child: Text( // REM: Texto
+    return ElevatedButton(
+      child: Text(
         title,
         textAlign: TextAlign.center,
-        style: TextStyle(fontFamily: 'CourierNew', fontSize: 14)
+        style: TextStyle(fontFamily: 'CourierNew', fontSize: 14),
       ),
-      onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => screen)), // REM: Navega a la pantalla
+      onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => screen)),
     );
   }
 }
