@@ -10,9 +10,7 @@ class MantenimientoMenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('MANTENIMIENTO'),
-      ),
+      appBar: AppBar(title: Text('MANTENIMIENTO')),
       backgroundColor: Colors.black,
       body: ListView(
         padding: EdgeInsets.all(15),
