@@ -17,7 +17,6 @@ class HomeScreen extends StatelessWidget {
     final auth = Provider.of<AuthService>(context);
     bool isAdmin = auth.currentUser?['rol'] == 'admin';
 
-    // Lista de botones según rol
     final List<Map<String, dynamic>> botones = [
       {'titulo': 'NUEVA VENTA', 'screen': VentaScreen()},
       if (isAdmin) ...[
@@ -40,33 +39,24 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Padding(
         padding: EdgeInsets.all(8),
-        child: Column(
+        child: GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 1.15,
           children: [
-            // GRID DE BOTONES
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 1.15,
-                children: [
-                  ...botones.map((b) => _btnCuadrado(
-                    context,
-                    b['titulo'] as String,
-                    b['screen'] as Widget,
-                  )),
-                  // Botón SALIR al final
-                  _btnSalir(context, auth),
-                ],
-              ),
-            ),
+            ...botones.map((b) => _btnCuadrado(
+              context,
+              b['titulo'] as String,
+              b['screen'] as Widget,
+            )),
+            _btnSalir(context, auth),
           ],
         ),
       ),
     );
   }
 
-  /// Botón cuadrado con borde negro sólido
   Widget _btnCuadrado(BuildContext ctx, String titulo, Widget screen) {
     return Container(
       decoration: BoxDecoration(
@@ -100,7 +90,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  /// Botón SALIR cuadrado
   Widget _btnSalir(BuildContext ctx, AuthService auth) {
     return Container(
       decoration: BoxDecoration(
@@ -134,3 +123,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
