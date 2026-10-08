@@ -9,6 +9,7 @@ import 'rentabilidad_screen.dart'; // REM: Pantalla de reporte de ganancias (sol
 import 'cxc_screen.dart'; // REM: Pantalla de cuentas por cobrar (solo admin)
 import 'admin_personal_screen.dart'; // REM: Pantalla de gestión de personal (solo admin)
 import 'compra_screen.dart'; // REM: Pantalla de registro de gastos (solo admin)
+import 'mantenimiento/mantenimiento_menu_screen.dart'; // REM: NUEVO - Menú de mantenimiento (solo admin)
 
 class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal sin estado mutable
   @override
@@ -22,46 +23,92 @@ class HomeScreen extends StatelessWidget { // REM: Pantalla de menú principal s
         backgroundColor: Colors.black, // REM: Fondo negro de la barra
       ),
       backgroundColor: Colors.black, // REM: Fondo negro de toda la pantalla
-      body: GridView.count( // REM: Cuadrícula de botones organizada en filas y columnas
-        crossAxisCount: 2, // REM: Dos columnas de botones
-        padding: EdgeInsets.all(15), // REM: Margen de 15 píxeles alrededor
-        crossAxisSpacing: 15, // REM: Espacio horizontal entre botones
-        mainAxisSpacing: 15, // REM: Espacio vertical entre botones
-        children: [
-          _btn(context, 'NUEVA VENTA', VentaScreen()), // REM: Botón de venta (visible para todos los roles)
-          
-          if (isAdmin) ...[ // REM: Bloque condicional: solo se muestra si el usuario es admin
-            _btn(context, 'ENVIAR STOCK', TransferenciaScreen()), // REM: Botón para trasladar stock entre puntos
-            _btn(context, 'GESTIÓN PERSONAL', AdminPersonalScreen()), // REM: Botón para crear/editar usuarios
-            _btn(context, 'CIERRE DE CAJA', CierreCajaScreen()), // REM: Botón para cerrar jornada y cuadrar caja
-            _btn(context, 'MI RENTABILIDAD', RentabilidadScreen()), // REM: Botón para ver ganancias del mes
-            _btn(context, 'CUENTAS X COBRAR', CxcScreen()), // REM: Botón para ver deudas de clientes
-            _btn(context, 'REGISTRAR GASTO', CompraScreen()), // REM: Botón para registrar gastos operativos
+      body: SingleChildScrollView( // REM: NUEVO - Permite scroll si hay muchos botones
+        child: Column( // REM: NUEVO - Organiza el contenido en columna
+          children: [
+            // ═══════════════════════════════════════════════════
+            // BOTÓN DESTACADO: MANTENIMIENTO (solo admin)
+            // ═══════════════════════════════════════════════════
+            if (isAdmin)
+              Padding( // REM: Margen alrededor del botón
+                padding: EdgeInsets.fromLTRB(15, 15, 15, 0), // REM: Izq, arriba, der, abajo
+                child: SizedBox( // REM: Contenedor con tamaño definido
+                  width: double.infinity, // REM: Ancho completo
+                  height: 70, // REM: Alto destacado
+                  child: ElevatedButton.icon( // REM: Botón con ícono
+                    onPressed: () => Navigator.push( // REM: Al presionar navega a mantenimiento
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MantenimientoMenuScreen(),
+                      ),
+                    ),
+                    icon: Icon(Icons.build, color: Colors.black, size: 32), // REM: Ícono de herramienta
+                    label: Text( // REM: Texto del botón
+                      'MANTENIMIENTO',
+                      style: TextStyle(
+                        fontFamily: 'CourierNew',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom( // REM: Estilo especial
+                      backgroundColor: Colors.orange, // REM: Naranja para destacarlo
+                      foregroundColor: Colors.black, // REM: Texto negro
+                      shape: RoundedRectangleBorder( // REM: Bordes redondeados
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // ═══════════════════════════════════════════════════
+            // GRID DE BOTONES ORIGINALES
+            // ═══════════════════════════════════════════════════
+            GridView.count( // REM: Cuadrícula de botones
+              crossAxisCount: 2, // REM: Dos columnas
+              padding: EdgeInsets.all(15), // REM: Margen interno
+              crossAxisSpacing: 15, // REM: Espacio horizontal
+              mainAxisSpacing: 15, // REM: Espacio vertical
+              shrinkWrap: true, // REM: NUEVO - Permite anidar en Column
+              physics: NeverScrollableScrollPhysics(), // REM: NUEVO - Desactiva scroll propio
+              children: [
+                _btn(context, 'NUEVA VENTA', VentaScreen()), // REM: Botón de venta
+                
+                if (isAdmin) ...[ // REM: Botones solo para admin
+                  _btn(context, 'ENVIAR STOCK', TransferenciaScreen()),
+                  _btn(context, 'GESTIÓN PERSONAL', AdminPersonalScreen()),
+                  _btn(context, 'CIERRE DE CAJA', CierreCajaScreen()),
+                  _btn(context, 'MI RENTABILIDAD', RentabilidadScreen()),
+                  _btn(context, 'CUENTAS X COBRAR', CxcScreen()),
+                  _btn(context, 'REGISTRAR GASTO', CompraScreen()),
+                ],
+                
+                _btn(context, 'RECIBIR INICIO JORNADA', RecepcionTrasladosScreen()),
+                
+                ElevatedButton( // REM: Botón de salir
+                  onPressed: () {
+                    auth.logout();
+                    Navigator.pushReplacementNamed(context, '/');
+                  },
+                  child: Text('SALIR', style: TextStyle(fontFamily: 'CourierNew', fontSize: 14)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                ),
+              ],
+            ),
           ],
-          
-          _btn(context, 'RECIBIR INICIO JORNADA', RecepcionTrasladosScreen()), // REM: Botón para cargar stock y cambio inicial (todos los roles)
-          
-          ElevatedButton( // REM: Botón de salir del sistema
-            onPressed: () { // REM: Acción al presionar
-              auth.logout(); // REM: Cierra la sesión del usuario
-              Navigator.pushReplacementNamed(context, '/'); // REM: Vuelve a la pantalla de login
-            },
-            child: Text('SALIR'), // REM: Texto del botón
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red), // REM: Color rojo para indicar acción de salida
-          )
-        ],
+        ),
       ),
     );
   }
 
-  Widget _btn(BuildContext ctx, String title, Widget screen) { // REM: Función auxiliar para crear botones uniformes
-    return ElevatedButton( // REM: Crea un botón elevado con estilo
-      child: Text( // REM: Texto dentro del botón
-        title, // REM: Título del botón (ej: 'NUEVA VENTA')
-        textAlign: TextAlign.center, // REM: Texto centrado
-        style: TextStyle(fontFamily: 'CourierNew', fontSize: 14) // REM: Fuente Courier New, tamaño 14
+  Widget _btn(BuildContext ctx, String title, Widget screen) { // REM: Función auxiliar para botones uniformes
+    return ElevatedButton( // REM: Botón elevado
+      child: Text( // REM: Texto
+        title,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontFamily: 'CourierNew', fontSize: 14)
       ),
-      onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => screen)), // REM: Al presionar, navega a la pantalla correspondiente
+      onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => screen)), // REM: Navega a la pantalla
     );
   }
 }
