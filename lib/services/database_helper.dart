@@ -272,11 +272,16 @@ class DatabaseHelper extends ChangeNotifier {
     final db = await database;
     return await db.transaction((txn) async {
       int prodId = await txn.insert('productos', {
-        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId, 'activo': 1,
+        'codigo': codigo,
+        'nombre': nombre,
+        'categoria_id': categoriaId,
+        'activo': 1,
       });
       for (var entry in precios.entries) {
         await txn.insert('precios', {
-          'producto_id': prodId, 'punto_venta_id': entry.key, 'precio': entry.value,
+          'producto_id': prodId,
+          'punto_venta_id': entry.key,
+          'precio': entry.value,
         });
       }
       return prodId;
@@ -293,7 +298,9 @@ class DatabaseHelper extends ChangeNotifier {
     final db = await database;
     await db.transaction((txn) async {
       await txn.update('productos', {
-        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId,
+        'codigo': codigo,
+        'nombre': nombre,
+        'categoria_id': categoriaId,
       }, where: 'id = ?', whereArgs: [productoId]);
 
       for (var entry in precios.entries) {
@@ -302,7 +309,9 @@ class DatabaseHelper extends ChangeNotifier {
             whereArgs: [productoId, entry.key]);
         if (existe.isEmpty) {
           await txn.insert('precios', {
-            'producto_id': productoId, 'punto_venta_id': entry.key, 'precio': entry.value,
+            'producto_id': productoId,
+            'punto_venta_id': entry.key,
+            'precio': entry.value,
           });
         } else {
           await txn.update('precios', {'precio': entry.value},
