@@ -38,7 +38,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final pvId = _pvId;
 
-    // Cargar apertura de caja (saldo inicial)
     final aperturas = await db.consultar('aperturas_caja',
         where: 'fecha = ? AND punto_venta_id = ?',
         whereArgs: [_hoy, pvId]);
@@ -46,25 +45,21 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       _saldoInicial = (aperturas.first['saldo_inicial'] as num?)?.toDouble() ?? 0.0;
     }
 
-    // Cargar ventas del día
     final ventas = await db.consultar('ventas',
         where: 'fecha LIKE ? AND punto_venta_id = ?',
         whereArgs: ['$_hoy%', pvId]);
-    _totalVentas = ventas.fold(0.0,
-        (sum, v) => sum + ((v['monto_total'] as num?)?.toDouble() ?? 0.0));
+    _totalVentas = ventas.fold(
+        0.0, (sum, v) => sum + ((v['monto_total'] as num?)?.toDouble() ?? 0.0));
 
-    // Cargar gastos del día
     final gastos = await db.consultar('gastos_internos',
         where: 'fecha LIKE ?', whereArgs: ['$_hoy%']);
-    _totalGastos = gastos.fold(0.0,
-        (sum, g) => sum + ((g['monto'] as num?)?.toDouble() ?? 0.0));
+    _totalGastos = gastos.fold(
+        0.0, (sum, g) => sum + ((g['monto'] as num?)?.toDouble() ?? 0.0));
 
-    // Cargar stock actual del día
     final stockHoy = await db.consultar('inventario',
         where: 'punto_venta_id = ? AND fecha = ?',
         whereArgs: [pvId, _hoy]);
 
-    // Enriquecer con nombre de producto
     final productos = db.products;
     final List<Map<String, dynamic>> stockConNombre = [];
     for (var s in stockHoy) {
@@ -101,7 +96,9 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
     if (_efectivoCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ingrese el efectivo contado'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Ingrese el efectivo contado'),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -111,14 +108,16 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
         title: Text('¿CONFIRMAR CIERRE?',
-            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 15)),
+            style: TextStyle(
+                color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 15)),
         content: Text(
           'Al cerrar:\n\n'
           '- Se cierra tu asignación de hoy\n'
           '- El stock retorna a BASE (${_totalRetorno.toInt()} unidades)\n'
           '- El stock queda en 0 para mañana\n\n'
           '¿Continuar?',
-          style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
+          style: TextStyle(
+              color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
         ),
         actions: [
           TextButton(
@@ -141,7 +140,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     final usuarioId = auth.currentUser?['id'];
 
     try {
-      // 1. Registrar cierre de caja
       await db.insertar('cierres_caja', {
         'fecha': _hoy,
         'punto_venta_id': pvId,
@@ -155,7 +153,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         'observaciones': _observacionesCtrl.text,
       });
 
-      // 2. Cerrar asignación activa del día
       final asignaciones = await db.consultar('asignaciones_diarias',
           where: 'usuario_id = ? AND fecha = ? AND estado = ?',
           whereArgs: [usuarioId, _hoy, 'ACTIVO']);
@@ -167,7 +164,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         });
       }
 
-      // 3. Resetear stock a cero
       for (var p in _productosStock) {
         await db.actualizar('inventario', {
           'id': p['id'],
@@ -175,7 +171,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         });
       }
 
-      // 4. Auditoría
       await db.insertar('auditoria_cambios', {
         'fecha': DateTime.now().toIso8601String(),
         'usuario_id': usuarioId,
@@ -188,7 +183,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       });
 
       if (mounted) {
-        // Logout tras cierre
         auth.logout();
         Navigator.pushReplacementNamed(context, '/');
       }
@@ -204,7 +198,8 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     if (_cargando) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: Text('CIERRE DE CAJA'), backgroundColor: Colors.black),
+        appBar:
+            AppBar(title: Text('CIERRE DE CAJA'), backgroundColor: Colors.black),
         body: Center(child: CircularProgressIndicator(color: Colors.yellow)),
       );
     }
@@ -221,15 +216,22 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _filaDato('Fecha:', _hoy),
-            _filaDato('Saldo inicial:', 'S/ ${_saldoInicial.toStringAsFixed(2)}'),
-            _filaDato('Total ventas:', 'S/ ${_totalVentas.toStringAsFixed(2)}'),
-            _filaDato('Total gastos:', 'S/ ${_totalGastos.toStringAsFixed(2)}'),
+            _filaDato(
+                'Saldo inicial:', 'S/ ${_saldoInicial.toStringAsFixed(2)}'),
+            _filaDato(
+                'Total ventas:', 'S/ ${_totalVentas.toStringAsFixed(2)}'),
+            _filaDato(
+                'Total gastos:', 'S/ ${_totalGastos.toStringAsFixed(2)}'),
             Divider(color: Colors.yellow),
-            _filaDato('SALDO TEÓRICO:', 'S/ ${_saldoTeorico.toStringAsFixed(2)}', negrita: true),
-
+            _filaDato('SALDO TEÓRICO:',
+                'S/ ${_saldoTeorico.toStringAsFixed(2)}',
+                negrita: true),
             SizedBox(height: 20),
             Text('CONTEO FÍSICO',
-                style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    color: Colors.yellow,
+                    fontFamily: 'CourierNew',
+                    fontWeight: FontWeight.bold)),
             SizedBox(height: 10),
             TextField(
               controller: _efectivoCtrl,
@@ -262,25 +264,34 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
               ),
               style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
             ),
-
             SizedBox(height: 20),
             Text('RETORNO A BASE',
-                style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    color: Colors.yellow,
+                    fontFamily: 'CourierNew',
+                    fontWeight: FontWeight.bold)),
             SizedBox(height: 5),
-            Text('${_productosStock.length} productos · ${_totalRetorno.toInt()} unidades sin vender',
-                style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 12)),
+            Text(
+                '${_productosStock.length} productos · ${_totalRetorno.toInt()} unidades sin vender',
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontFamily: 'CourierNew',
+                    fontSize: 12)),
             SizedBox(height: 10),
             Container(
               constraints: BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
                 color: Color(0xFF1A1A1A),
-                border: Border.all(color: Colors.yellow54),
+                border: Border.all(color: Colors.yellow),
               ),
               child: _productosStock.isEmpty
                   ? Padding(
                       padding: EdgeInsets.all(10),
                       child: Text('Sin stock registrado hoy',
-                          style: TextStyle(color: Colors.white38, fontFamily: 'CourierNew', fontSize: 11)),
+                          style: TextStyle(
+                              color: Colors.white38,
+                              fontFamily: 'CourierNew',
+                              fontSize: 11)),
                     )
                   : ListView.builder(
                       itemCount: _productosStock.length,
@@ -289,14 +300,19 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                         return ListTile(
                           dense: true,
                           title: Text('${p['codigo']} ${p['nombre']}',
-                              style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'CourierNew',
+                                  fontSize: 12)),
                           trailing: Text('${p['stock']}',
-                              style: TextStyle(color: Colors.orange, fontFamily: 'CourierNew', fontWeight: FontWeight.bold)),
+                              style: TextStyle(
+                                  color: Colors.orange,
+                                  fontFamily: 'CourierNew',
+                                  fontWeight: FontWeight.bold)),
                         );
                       },
                     ),
             ),
-
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: _confirmarCierre,
@@ -324,13 +340,15 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                   color: Colors.white70,
                   fontFamily: 'CourierNew',
                   fontSize: negrita ? 14 : 12,
-                  fontWeight: negrita ? FontWeight.bold : FontWeight.normal)),
+                  fontWeight:
+                      negrita ? FontWeight.bold : FontWeight.normal)),
           Text(valor,
               style: TextStyle(
                   color: negrita ? Colors.yellow : Colors.white,
                   fontFamily: 'CourierNew',
                   fontSize: negrita ? 14 : 12,
-                  fontWeight: negrita ? FontWeight.bold : FontWeight.normal)),
+                  fontWeight:
+                      negrita ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
