@@ -493,21 +493,3 @@ class DatabaseHelper extends ChangeNotifier {
       LEFT JOIN puntos_venta o ON t.origen_id = o.id
       WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
       ORDER BY t.codigo ASC, p.codigo ASC
-    ''', [pvId]);
-  }
-
-  Future<void> recibirTraslado({
-    required String codigo,
-    required int destinoId,
-    required List<Map<String, dynamic>> itemsConCantidad,
-  }) async {
-    final db = await database;
-    final hoy = DateTime.now().toIso8601String().split('T')[0];
-
-    for (var item in itemsConCantidad) {
-      final id = item['id'] as int;
-      final cantRecibida = item['cantidad_recibida'] as int;
-      final prodId = item['producto_id'] as int;
-
-      await db.update('transferencias', {
-        'cantidad_recibida':
