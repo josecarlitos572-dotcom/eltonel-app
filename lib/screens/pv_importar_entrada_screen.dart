@@ -49,7 +49,6 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
       final destino = header['destino'] as String? ?? '';
       final items = (payload['items'] as List?) ?? [];
 
-      // Validar que este PV sea el destinatario
       final db2 = await db.database;
       final misDatos = await db2.query('puntos_venta',
           where: 'id = ?', whereArgs: [_pvId]);
@@ -59,7 +58,6 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
         throw Exception('Este batch no es para tu punto ($miCodigo). Es para $destino.');
       }
 
-      // Verificar si ya fue importado (por hash)
       final hashRecibido = header['hash'] as String? ?? '';
       final yaExiste = await db2.query('batches_recibidos',
           where: 'hash = ?', whereArgs: [hashRecibido]);
@@ -67,14 +65,12 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
         throw Exception('Este batch ya fue importado antes');
       }
 
-      // Sumar stock
       int totalItems = 0;
       for (var item in items) {
         final prodId = item['producto_id'] as int;
         final cant = (item['cantidad'] as num).toInt();
         if (cant <= 0) continue;
 
-        // Buscar si ya existe registro hoy
         final existente = await db2.query('inventario',
             where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
             whereArgs: [prodId, _pvId, _hoy]);
@@ -95,7 +91,6 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
         totalItems += cant;
       }
 
-      // Guardar registro del batch recibido
       await db2.insert('batches_recibidos', {
         'tipo': tipo,
         'origen': header['origen'] ?? '',
@@ -110,7 +105,6 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
         'estado': 'RECIBIDO',
       });
 
-      // Auditoría
       await db2.insert('auditoria_cambios', {
         'fecha': DateTime.now().toIso8601String(),
         'usuario_id': _pvId,
@@ -139,7 +133,6 @@ class _PvImportarEntradaScreenState extends State<PvImportarEntradaScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        // Recargar cache
         await db.getProductos();
       }
     } catch (e) {
