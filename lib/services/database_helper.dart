@@ -24,402 +24,36 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''CREATE TABLE puntos_venta (
-      id INTEGER PRIMARY KEY,
-      nombre TEXT,
-      codigo TEXT UNIQUE,
-      direccion TEXT,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE categorias_producto (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT UNIQUE NOT NULL,
-      abreviatura TEXT,
-      orden INTEGER DEFAULT 0,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE categorias_gasto (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT UNIQUE NOT NULL,
-      limite_max REAL DEFAULT 9999,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE productos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      codigo TEXT UNIQUE,
-      nombre TEXT,
-      categoria_id INTEGER,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE precios (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      producto_id INTEGER,
-      punto_venta_id INTEGER,
-      precio REAL
-    )''');
-
-    await db.execute('''CREATE TABLE personal (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      apellidos TEXT,
-      nombres TEXT,
-      dni TEXT UNIQUE,
-      fono TEXT,
-      rol TEXT,
-      password TEXT,
-      punto_venta_id INTEGER,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE clientes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL,
-      dni TEXT,
-      fono TEXT,
-      direccion TEXT,
-      activo INTEGER DEFAULT 1
-    )''');
-
-    await db.execute('''CREATE TABLE inventario (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      producto_id INTEGER,
-      punto_venta_id INTEGER,
-      stock INTEGER,
-      fecha TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE ventas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cliente_id INTEGER,
-      usuario_id INTEGER,
-      punto_venta_id INTEGER,
-      fecha TEXT,
-      tipo_venta TEXT,
-      monto_total REAL,
-      vuelto REAL,
-      tiene_comprobante INTEGER DEFAULT 0,
-      nombre_cliente TEXT,
-      fecha_vencimiento TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE detalle_venta (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      venta_id INTEGER,
-      producto_id INTEGER,
-      cantidad INTEGER,
-      precio_unitario REAL,
-      subtotal REAL
-    )''');
-
-    await db.execute('''CREATE TABLE gastos_internos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      categoria TEXT NOT NULL,
-      descripcion TEXT,
-      monto REAL NOT NULL,
-      tiene_comprobante INTEGER DEFAULT 0,
-      usuario_id INTEGER
-    )''');
-
-    await db.execute('''CREATE TABLE cierres_caja (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      punto_venta_id INTEGER,
-      personal_id INTEGER,
-      saldo_inicial REAL DEFAULT 0,
-      total_ventas REAL DEFAULT 0,
-      total_gastos_manuales REAL DEFAULT 0,
-      saldo_teorico REAL DEFAULT 0,
-      saldo_real_contado REAL DEFAULT 0,
-      diferencia REAL DEFAULT 0,
-      observaciones TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE aperturas_caja (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      punto_venta_id INTEGER,
-      personal_id INTEGER,
-      saldo_inicial REAL DEFAULT 0
-    )''');
-
-    await db.execute('''CREATE TABLE transferencias (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      producto_id INTEGER NOT NULL,
-      cantidad INTEGER NOT NULL,
-      origen_id INTEGER NOT NULL,
-      destino_id INTEGER NOT NULL,
-      usuario_id INTEGER
-    )''');
-
-    await db.execute('''CREATE TABLE cuentas_por_cobrar (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      venta_id INTEGER,
-      cliente_id INTEGER,
-      cliente_nombre TEXT,
-      cliente_telefono TEXT,
-      monto_original REAL,
-      monto_pagado REAL DEFAULT 0,
-      saldo_pendiente REAL,
-      fecha_venta TEXT,
-      fecha_vencimiento TEXT,
-      estado TEXT DEFAULT 'PENDIENTE',
-      punto_venta_id INTEGER,
-      observaciones TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE cobros (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cuenta_id INTEGER,
-      fecha_cobro TEXT,
-      monto_cobrado REAL,
-      tipo_pago TEXT,
-      usuario_id INTEGER,
-      observaciones TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE quiebres (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT,
-      hora TEXT,
-      punto_venta_id INTEGER,
-      producto_id INTEGER,
-      tipo TEXT,
-      cantidad_pedida INTEGER,
-      consultado_base INTEGER DEFAULT 0,
-      consultado_otros_puntos INTEGER DEFAULT 0,
-      recuperado_por_traslado INTEGER DEFAULT 0,
-      venta_perdida_estimada REAL DEFAULT 0,
-      usuario_id INTEGER,
-      observaciones TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE batches_generados (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tipo TEXT,
-      origen TEXT,
-      destino TEXT,
-      periodo TEXT,
-      secuencial INTEGER,
-      hash TEXT,
-      hash_anterior TEXT,
-      contenido_json TEXT,
-      fecha_generacion TEXT,
-      estado TEXT DEFAULT 'GENERADO'
-    )''');
-
-    await db.execute('''CREATE TABLE batches_recibidos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tipo TEXT,
-      origen TEXT,
-      destino TEXT,
-      periodo TEXT,
-      secuencial INTEGER,
-      hash TEXT,
-      hash_anterior TEXT,
-      contenido_json TEXT,
-      fecha_generacion TEXT,
-      fecha_recepcion TEXT,
-      estado TEXT DEFAULT 'RECIBIDO'
-    )''');
-
-    await db.execute('''CREATE TABLE asignaciones_diarias (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT,
-      usuario_id INTEGER,
-      punto_venta_id INTEGER,
-      hora_inicio TEXT,
-      hora_fin TEXT,
-      estado TEXT DEFAULT 'ACTIVO',
-      activado_por INTEGER
-    )''');
-
-    await db.execute('''CREATE TABLE parametros (
-      clave TEXT PRIMARY KEY,
-      valor TEXT,
-      descripcion TEXT
-    )''');
-
-    await db.execute('''CREATE TABLE auditoria_cambios (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT,
-      usuario_id INTEGER,
-      usuario_nombre TEXT,
-      tabla_afectada TEXT,
-      accion TEXT,
-      registro_id INTEGER,
-      datos_anteriores TEXT,
-      datos_nuevos TEXT
-    )''');
+    await db.execute('''CREATE TABLE puntos_venta (id INTEGER PRIMARY KEY, nombre TEXT, codigo TEXT UNIQUE, direccion TEXT, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE categorias_producto (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL, abreviatura TEXT, orden INTEGER DEFAULT 0, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE categorias_gasto (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL, limite_max REAL DEFAULT 9999, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT UNIQUE, nombre TEXT, categoria_id INTEGER, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE precios (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_id INTEGER, punto_venta_id INTEGER, precio REAL)''');
+    await db.execute('''CREATE TABLE personal (id INTEGER PRIMARY KEY AUTOINCREMENT, apellidos TEXT, nombres TEXT, dni TEXT UNIQUE, fono TEXT, rol TEXT, password TEXT, punto_venta_id INTEGER, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE clientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, dni TEXT, fono TEXT, direccion TEXT, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE inventario (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_id INTEGER, punto_venta_id INTEGER, stock INTEGER, fecha TEXT)''');
+    await db.execute('''CREATE TABLE ventas (id INTEGER PRIMARY KEY AUTOINCREMENT, cliente_id INTEGER, usuario_id INTEGER, punto_venta_id INTEGER, fecha TEXT, tipo_venta TEXT, monto_total REAL, vuelto REAL, tiene_comprobante INTEGER DEFAULT 0, nombre_cliente TEXT, fecha_vencimiento TEXT)''');
+    await db.execute('''CREATE TABLE detalle_venta (id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER, producto_id INTEGER, cantidad INTEGER, precio_unitario REAL, subtotal REAL)''');
+    await db.execute('''CREATE TABLE gastos_internos (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, categoria TEXT NOT NULL, descripcion TEXT, monto REAL NOT NULL, tiene_comprobante INTEGER DEFAULT 0, usuario_id INTEGER)''');
+    await db.execute('''CREATE TABLE cierres_caja (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, punto_venta_id INTEGER, personal_id INTEGER, saldo_inicial REAL DEFAULT 0, total_ventas REAL DEFAULT 0, total_gastos_manuales REAL DEFAULT 0, saldo_teorico REAL DEFAULT 0, saldo_real_contado REAL DEFAULT 0, diferencia REAL DEFAULT 0, observaciones TEXT)''');
+    await db.execute('''CREATE TABLE aperturas_caja (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, punto_venta_id INTEGER, personal_id INTEGER, saldo_inicial REAL DEFAULT 0)''');
+    await db.execute('''CREATE TABLE transferencias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, producto_id INTEGER NOT NULL, cantidad INTEGER NOT NULL, origen_id INTEGER NOT NULL, destino_id INTEGER NOT NULL, usuario_id INTEGER)''');
+    await db.execute('''CREATE TABLE cuentas_por_cobrar (id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER, cliente_id INTEGER, cliente_nombre TEXT, cliente_telefono TEXT, monto_original REAL, monto_pagado REAL DEFAULT 0, saldo_pendiente REAL, fecha_venta TEXT, fecha_vencimiento TEXT, estado TEXT DEFAULT 'PENDIENTE', punto_venta_id INTEGER, observaciones TEXT)''');
+    await db.execute('''CREATE TABLE cobros (id INTEGER PRIMARY KEY AUTOINCREMENT, cuenta_id INTEGER, fecha_cobro TEXT, monto_cobrado REAL, tipo_pago TEXT, usuario_id INTEGER, observaciones TEXT)''');
+    await db.execute('''CREATE TABLE quiebres (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, hora TEXT, punto_venta_id INTEGER, producto_id INTEGER, tipo TEXT, cantidad_pedida INTEGER, consultado_base INTEGER DEFAULT 0, consultado_otros_puntos INTEGER DEFAULT 0, recuperado_por_traslado INTEGER DEFAULT 0, venta_perdida_estimada REAL DEFAULT 0, usuario_id INTEGER, observaciones TEXT)''');
+    await db.execute('''CREATE TABLE batches_generados (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, origen TEXT, destino TEXT, periodo TEXT, secuencial INTEGER, hash TEXT, hash_anterior TEXT, contenido_json TEXT, fecha_generacion TEXT, estado TEXT DEFAULT 'GENERADO')''');
+    await db.execute('''CREATE TABLE batches_recibidos (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, origen TEXT, destino TEXT, periodo TEXT, secuencial INTEGER, hash TEXT, hash_anterior TEXT, contenido_json TEXT, fecha_generacion TEXT, fecha_recepcion TEXT, estado TEXT DEFAULT 'RECIBIDO')''');
+    await db.execute('''CREATE TABLE asignaciones_diarias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, punto_venta_id INTEGER, hora_inicio TEXT, hora_fin TEXT, estado TEXT DEFAULT 'ACTIVO', activado_por INTEGER)''');
+    await db.execute('''CREATE TABLE parametros (clave TEXT PRIMARY KEY, valor TEXT, descripcion TEXT)''');
+    await db.execute('''CREATE TABLE auditoria_cambios (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, usuario_nombre TEXT, tabla_afectada TEXT, accion TEXT, registro_id INTEGER, datos_anteriores TEXT, datos_nuevos TEXT)''');
 
     await _seedSystem(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 6) {
-      await db.execute('''CREATE TABLE IF NOT EXISTS categorias_producto (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT UNIQUE NOT NULL,
-        activo INTEGER DEFAULT 1
-      )''');
-      try {
-        await db.execute('ALTER TABLE productos ADD COLUMN codigo TEXT');
-      } catch (e) {}
-      await db.delete('precios');
-      await db.delete('productos');
-      await db.delete('categorias_producto');
-      await _seedProductosYCategorias(db);
-    }
-    if (oldVersion < 7) {
-      try {
-        await db.execute('ALTER TABLE categorias_producto ADD COLUMN abreviatura TEXT');
-      } catch (e) {}
-      final abreviaturas = {
-        'Sándwiches': 'SAN',
-        'Bebidas Calientes': 'BEC',
-        'Bebidas Frías': 'BEF',
-        'Jugos': 'JUG',
-        'Ensaladas': 'ENS',
-        'Huevos Sancochados': 'HUE',
-        'Comidas': 'COM',
-      };
-      for (var entry in abreviaturas.entries) {
-        await db.update('categorias_producto',
-          {'abreviatura': entry.value},
-          where: 'nombre = ?',
-          whereArgs: [entry.key]);
-      }
-    }
-    if (oldVersion < 8) {
-      await db.execute('''CREATE TABLE IF NOT EXISTS clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        dni TEXT,
-        fono TEXT,
-        direccion TEXT,
-        activo INTEGER DEFAULT 1
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS cuentas_por_cobrar (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        venta_id INTEGER,
-        cliente_id INTEGER,
-        cliente_nombre TEXT,
-        cliente_telefono TEXT,
-        monto_original REAL,
-        monto_pagado REAL DEFAULT 0,
-        saldo_pendiente REAL,
-        fecha_venta TEXT,
-        fecha_vencimiento TEXT,
-        estado TEXT DEFAULT 'PENDIENTE',
-        punto_venta_id INTEGER,
-        observaciones TEXT
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS cobros (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cuenta_id INTEGER,
-        fecha_cobro TEXT,
-        monto_cobrado REAL,
-        tipo_pago TEXT,
-        usuario_id INTEGER,
-        observaciones TEXT
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS quiebres (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        hora TEXT,
-        punto_venta_id INTEGER,
-        producto_id INTEGER,
-        tipo TEXT,
-        cantidad_pedida INTEGER,
-        consultado_base INTEGER DEFAULT 0,
-        consultado_otros_puntos INTEGER DEFAULT 0,
-        recuperado_por_traslado INTEGER DEFAULT 0,
-        venta_perdida_estimada REAL DEFAULT 0,
-        usuario_id INTEGER,
-        observaciones TEXT
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS batches_generados (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo TEXT,
-        origen TEXT,
-        destino TEXT,
-        periodo TEXT,
-        secuencial INTEGER,
-        hash TEXT,
-        hash_anterior TEXT,
-        contenido_json TEXT,
-        fecha_generacion TEXT,
-        estado TEXT DEFAULT 'GENERADO'
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS batches_recibidos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo TEXT,
-        origen TEXT,
-        destino TEXT,
-        periodo TEXT,
-        secuencial INTEGER,
-        hash TEXT,
-        hash_anterior TEXT,
-        contenido_json TEXT,
-        fecha_generacion TEXT,
-        fecha_recepcion TEXT,
-        estado TEXT DEFAULT 'RECIBIDO'
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS asignaciones_diarias (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        usuario_id INTEGER,
-        punto_venta_id INTEGER,
-        hora_inicio TEXT,
-        hora_fin TEXT,
-        estado TEXT DEFAULT 'ACTIVO',
-        activado_por INTEGER
-      )''');
-      await db.execute('''CREATE TABLE IF NOT EXISTS parametros (
-        clave TEXT PRIMARY KEY,
-        valor TEXT,
-        descripcion TEXT
-      )''');
-      await _seedParametros(db);
-    }
-    if (oldVersion < 9) {
-      try {
-        await db.execute('ALTER TABLE puntos_venta ADD COLUMN direccion TEXT');
-      } catch (e) {}
-      try {
-        await db.execute('ALTER TABLE categorias_producto ADD COLUMN orden INTEGER DEFAULT 0');
-      } catch (e) {}
-      await db.execute('''CREATE TABLE IF NOT EXISTS auditoria_cambios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        usuario_id INTEGER,
-        usuario_nombre TEXT,
-        tabla_afectada TEXT,
-        accion TEXT,
-        registro_id INTEGER,
-        datos_anteriores TEXT,
-        datos_nuevos TEXT
-      )''');
-      await db.rawUpdate('UPDATE categorias_producto SET orden = id');
-      await db.rawUpdate('UPDATE puntos_venta SET direccion = ""');
-    }
     if (oldVersion < 10) {
-      await db.update(
-        'categorias_gasto',
-        {'limite_max': 2.0},
-        where: 'nombre = ?',
-        whereArgs: ['SS.HH.'],
-      );
-      await db.update(
-        'parametros',
-        {'valor': '10'},
-        where: 'clave = ?',
-        whereArgs: ['version_bd'],
-      );
+      await db.update('categorias_gasto', {'limite_max': 2.0},
+          where: 'nombre = ?', whereArgs: ['SS.HH.']);
     }
   }
 
@@ -439,12 +73,8 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('categorias_gasto', {'nombre': 'Desayuno', 'limite_max': 6});
 
     await db.insert('personal', {
-      'apellidos': 'Dueño',
-      'nombres': 'Admin',
-      'dni': '00000000',
-      'rol': 'ADMIN',
-      'password': 'tonel123',
-      'punto_venta_id': 0
+      'apellidos': 'Dueño', 'nombres': 'Admin', 'dni': '00000000',
+      'rol': 'ADMIN', 'password': 'tonel123', 'punto_venta_id': 0
     });
 
     await _seedProductosYCategorias(db);
@@ -610,6 +240,89 @@ class DatabaseHelper extends ChangeNotifier {
     return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC');
   }
 
+  Future<Map<String, dynamic>?> getProductoPorId(int id) async {
+    final db = await database;
+    final r = await db.rawQuery('''
+      SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev
+      FROM productos p
+      LEFT JOIN categorias_producto c ON p.categoria_id = c.id
+      WHERE p.id = ?
+    ''', [id]);
+    if (r.isEmpty) return null;
+    return r.first;
+  }
+
+  Future<List<Map<String, dynamic>>> getPreciosDeProducto(int productoId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT pr.*, pv.nombre as punto_nombre, pv.codigo as punto_codigo
+      FROM precios pr
+      LEFT JOIN puntos_venta pv ON pr.punto_venta_id = pv.id
+      WHERE pr.producto_id = ?
+      ORDER BY pr.punto_venta_id ASC
+    ''', [productoId]);
+  }
+
+  Future<int> insertarProductoConPrecios({
+    required String codigo,
+    required String nombre,
+    required int categoriaId,
+    required Map<int, double> precios,
+  }) async {
+    final db = await database;
+    return await db.transaction((txn) async {
+      int prodId = await txn.insert('productos', {
+        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId, 'activo': 1,
+      });
+      for (var entry in precios.entries) {
+        await txn.insert('precios', {
+          'producto_id': prodId, 'punto_venta_id': entry.key, 'precio': entry.value,
+        });
+      }
+      return prodId;
+    });
+  }
+
+  Future<void> actualizarProductoConPrecios({
+    required int productoId,
+    required String codigo,
+    required String nombre,
+    required int categoriaId,
+    required Map<int, double> precios,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.update('productos', {
+        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId,
+      }, where: 'id = ?', whereArgs: [productoId]);
+
+      for (var entry in precios.entries) {
+        final existe = await txn.query('precios',
+            where: 'producto_id = ? AND punto_venta_id = ?',
+            whereArgs: [productoId, entry.key]);
+        if (existe.isEmpty) {
+          await txn.insert('precios', {
+            'producto_id': productoId, 'punto_venta_id': entry.key, 'precio': entry.value,
+          });
+        } else {
+          await txn.update('precios', {'precio': entry.value},
+              where: 'producto_id = ? AND punto_venta_id = ?',
+              whereArgs: [productoId, entry.key]);
+        }
+      }
+    });
+  }
+
+  Future<void> eliminarProductoLogico(int productoId) async {
+    final db = await database;
+    await db.update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [productoId]);
+  }
+
+  Future<void> reactivarProducto(int productoId) async {
+    final db = await database;
+    await db.update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [productoId]);
+  }
+
   Future<String?> getParametro(String clave) async {
     final db = await database;
     final r = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]);
@@ -623,32 +336,6 @@ class DatabaseHelper extends ChangeNotifier {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> registrarAuditoria({
-    required String tabla,
-    required String accion,
-    required int registroId,
-    Map<String, dynamic>? anterior,
-    Map<String, dynamic>? nuevo,
-    int? usuarioId,
-    String? usuarioNombre,
-  }) async {
-    final db = await database;
-    await db.insert('auditoria_cambios', {
-      'fecha': DateTime.now().toIso8601String(),
-      'usuario_id': usuarioId ?? 1,
-      'usuario_nombre': usuarioNombre ?? 'Admin',
-      'tabla_afectada': tabla,
-      'accion': accion,
-      'registro_id': registroId,
-      'datos_anteriores': anterior != null ? _mapToJson(anterior) : null,
-      'datos_nuevos': nuevo != null ? _mapToJson(nuevo) : null,
-    });
-  }
-
-  String _mapToJson(Map<String, dynamic> map) {
-    return map.entries.map((e) => '${e.key}: ${e.value}').join(', ');
-  }
-
   Future<void> _loadCache() async {
     final db = await database;
     _cachedProducts = await db.query('productos', where: 'activo = 1');
@@ -656,47 +343,4 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> get products => _cachedProducts;
-
-  Future<void> registrarVenta(Map<String, dynamic> ventaData, List<Map<String, dynamic>> items) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      int ventaId = await txn.insert('ventas', ventaData);
-      for (var item in items) {
-        await txn.insert('detalle_venta', {
-          'venta_id': ventaId,
-          'producto_id': item['id'],
-          'cantidad': item['qty'],
-          'precio_unitario': item['price'],
-          'subtotal': item['qty'] * item['price'],
-        });
-        await txn.rawUpdate(
-          'UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-          [item['qty'], item['id'], ventaData['punto_venta_id'], DateTime.now().toIso8601String().split('T')[0]],
-        );
-      }
-    });
-  }
-
-  Future<void> registrarGasto(String categoria, String desc, double monto, int tieneComp) async {
-    final db = await database;
-    await db.insert('gastos_internos', {
-      'fecha': DateTime.now().toIso8601String(),
-      'categoria': categoria,
-      'descripcion': desc,
-      'monto': monto,
-      'tiene_comprobante': tieneComp,
-      'usuario_id': 1,
-    });
-    notifyListeners();
-  }
-
-  Future<List<Map<String, dynamic>>> getResumenMensual() async {
-    final db = await database;
-    String mesActual = DateTime.now().toIso8601String().substring(0, 7);
-    var ventas = await db.rawQuery('SELECT SUM(monto_total) as total FROM ventas WHERE fecha LIKE ?', ['$mesActual%']);
-    var gastos = await db.rawQuery('SELECT SUM(monto) as total FROM gastos_internos WHERE fecha LIKE ?', ['$mesActual%']);
-    double totalVentas = ventas.first['total'] == null ? 0.0 : (ventas.first['total'] as num).toDouble();
-    double totalGastos = gastos.first['total'] == null ? 0.0 : (gastos.first['total'] as num).toDouble();
-    return [{'ventas': totalVentas, 'gastos': totalGastos, 'utilidad': totalVentas - totalGastos}];
-  }
 }
