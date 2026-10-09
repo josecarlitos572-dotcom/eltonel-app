@@ -241,6 +241,15 @@ class DatabaseHelper extends ChangeNotifier {
     return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
 
+  // =========================================================
+  // NUEVO MÉTODO AGREGADO PARA SOLUCIONAR EL ERROR DE BUILD
+  // =========================================================
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    return await db.rawQuery(sql, arguments);
+  }
+  // =========================================================
+
   Future<List<Map<String, dynamic>>> getProductos() async {
     final db = await database;
     return await db.rawQuery('''
