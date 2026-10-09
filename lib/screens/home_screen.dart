@@ -12,6 +12,7 @@ import 'cxc_screen.dart';
 import 'admin_personal_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
 import 'admin_importar_batch_screen.dart';
+import 'admin_dashboard_screen.dart';
 import 'compra_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 
@@ -26,6 +27,7 @@ class HomeScreen extends StatelessWidget {
       {'titulo': 'QUIEBRES', 'screen': QuiebresScreen()},
       {'titulo': 'RECIBIR ENTRADA', 'screen': PvImportarEntradaScreen()},
       if (isAdmin) ...[
+        {'titulo': 'DASHBOARD', 'screen': AdminDashboardScreen()},
         {'titulo': 'ACTIVAR VENDEDOR', 'screen': AdminActivarVendedorScreen()},
         {'titulo': 'IMPORTAR BATCH', 'screen': AdminImportarBatchScreen()},
         {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
