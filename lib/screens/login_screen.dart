@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (rol == 'VENDEDOR') {
       if (_diaSemana == 'dom') {
-        await auth.logout();
+        auth.logout();
         setState(() => _cargando = false);
         _mostrarDialogo(
           'HOY NO HAY LABOR',
@@ -84,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!_estaEnHorario('03:00', '11:00')) {
-        await auth.logout();
+        auth.logout();
         setState(() => _cargando = false);
         _mostrarDialogo(
           'FUERA DE HORARIO',
@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (asignaciones.isEmpty) {
-        await auth.logout();
+        auth.logout();
         setState(() => _cargando = false);
         _mostrarDialogo(
           'SIN ASIGNACIÓN',
