@@ -17,7 +17,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), 'eltonel.db');
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -37,7 +37,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.execute('''CREATE TABLE gastos_internos (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, categoria TEXT NOT NULL, descripcion TEXT, monto REAL NOT NULL, tiene_comprobante INTEGER DEFAULT 0, usuario_id INTEGER)''');
     await db.execute('''CREATE TABLE cierres_caja (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, punto_venta_id INTEGER, personal_id INTEGER, saldo_inicial REAL DEFAULT 0, total_ventas REAL DEFAULT 0, total_gastos_manuales REAL DEFAULT 0, saldo_teorico REAL DEFAULT 0, saldo_real_contado REAL DEFAULT 0, diferencia REAL DEFAULT 0, observaciones TEXT)''');
     await db.execute('''CREATE TABLE aperturas_caja (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, punto_venta_id INTEGER, personal_id INTEGER, saldo_inicial REAL DEFAULT 0)''');
-    await db.execute('''CREATE TABLE transferencias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, producto_id INTEGER NOT NULL, cantidad INTEGER NOT NULL, origen_id INTEGER NOT NULL, destino_id INTEGER NOT NULL, usuario_id INTEGER)''');
+    await db.execute('''CREATE TABLE transferencias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, producto_id INTEGER NOT NULL, cantidad INTEGER NOT NULL, cantidad_recibida INTEGER DEFAULT 0, origen_id INTEGER NOT NULL, destino_id INTEGER NOT NULL, usuario_id INTEGER, tipo TEXT DEFAULT 'TRASLADO', codigo TEXT, estado TEXT DEFAULT 'PENDIENTE')''');
     await db.execute('''CREATE TABLE cuentas_por_cobrar (id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER, cliente_id INTEGER, cliente_nombre TEXT, cliente_telefono TEXT, monto_original REAL, monto_pagado REAL DEFAULT 0, saldo_pendiente REAL, fecha_venta TEXT, fecha_vencimiento TEXT, estado TEXT DEFAULT 'PENDIENTE', punto_venta_id INTEGER, observaciones TEXT)''');
     await db.execute('''CREATE TABLE cobros (id INTEGER PRIMARY KEY AUTOINCREMENT, cuenta_id INTEGER, fecha_cobro TEXT, monto_cobrado REAL, tipo_pago TEXT, usuario_id INTEGER, observaciones TEXT)''');
     await db.execute('''CREATE TABLE quiebres (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, hora TEXT, punto_venta_id INTEGER, producto_id INTEGER, tipo TEXT, cantidad_pedida INTEGER, consultado_base INTEGER DEFAULT 0, consultado_otros_puntos INTEGER DEFAULT 0, recuperado_por_traslado INTEGER DEFAULT 0, venta_perdida_estimada REAL DEFAULT 0, usuario_id INTEGER, observaciones TEXT)''');
@@ -66,6 +66,20 @@ class DatabaseHelper extends ChangeNotifier {
       } catch (e) {}
       await db.update('puntos_venta',
           {'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
+    }
+    if (oldVersion < 12) {
+      try {
+        await db.execute('ALTER TABLE transferencias ADD COLUMN cantidad_recibida INTEGER DEFAULT 0');
+      } catch (e) {}
+      try {
+        await db.execute("ALTER TABLE transferencias ADD COLUMN tipo TEXT DEFAULT 'TRASLADO'");
+      } catch (e) {}
+      try {
+        await db.execute('ALTER TABLE transferencias ADD COLUMN codigo TEXT');
+      } catch (e) {}
+      try {
+        await db.execute("ALTER TABLE transferencias ADD COLUMN estado TEXT DEFAULT 'PENDIENTE'");
+      } catch (e) {}
     }
   }
 
@@ -102,7 +116,7 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'admin_whatsapp', 'valor': '51999999999', 'descripcion': 'WhatsApp del admin'},
       {'clave': 'hora_cierre', 'valor': '11:00', 'descripcion': 'Hora sugerida de cierre'},
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
-      {'clave': 'version_bd', 'valor': '11', 'descripcion': 'Versión actual de la BD'},
+      {'clave': 'version_bd', 'valor': '12', 'descripcion': 'Versión actual de la BD'},
     ];
     for (var p in params) {
       await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -397,5 +411,137 @@ class DatabaseHelper extends ChangeNotifier {
     double totalVentas = ventas.first['total'] == null ? 0.0 : (ventas.first['total'] as num).toDouble();
     double totalGastos = gastos.first['total'] == null ? 0.0 : (gastos.first['total'] as num).toDouble();
     return [{'ventas': totalVentas, 'gastos': totalGastos, 'utilidad': totalVentas - totalGastos}];
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  TRANSFERENCIAS Y TRASLADOS (BLOQUE 6)
+  // ═══════════════════════════════════════════════════════════
+
+  Future<String> generarCodigoTransferencia(String tipo) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+    final fechaCompacta = hoy.replaceAll('-', '');
+    final movs = await db.rawQuery(
+      'SELECT COUNT(*) as total FROM transferencias WHERE codigo LIKE ?',
+      ['$tipo-$fechaCompacta-%'],
+    );
+    final sec = ((movs.first['total'] as int?) ?? 0) + 1;
+    return '$tipo-$fechaCompacta-${sec.toString().padLeft(3, '0')}';
+  }
+
+  Future<List<Map<String, dynamic>>> getStockPuntoVenta(int pvId) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+    return await db.rawQuery('''
+      SELECT i.*, p.codigo as prod_codigo, p.nombre as prod_nombre
+      FROM inventario i
+      LEFT JOIN productos p ON i.producto_id = p.id
+      WHERE i.punto_venta_id = ? AND i.fecha = ? AND i.stock > 0
+      ORDER BY p.codigo ASC
+    ''', [pvId, hoy]);
+  }
+
+  Future<void> registrarTrasladoCompleto({
+    required int origenId,
+    required int destinoId,
+    required int usuarioId,
+    required List<Map<String, dynamic>> items,
+    required String tipo,
+  }) async {
+    final db = await database;
+    final codigo = await generarCodigoTransferencia(tipo);
+    final ahora = DateTime.now().toIso8601String();
+
+    for (var item in items) {
+      await db.insert('transferencias', {
+        'fecha': ahora,
+        'producto_id': item['producto_id'],
+        'cantidad': item['cantidad'],
+        'cantidad_recibida': 0,
+        'origen_id': origenId,
+        'destino_id': destinoId,
+        'usuario_id': usuarioId,
+        'tipo': tipo,
+        'codigo': codigo,
+        'estado': 'PENDIENTE',
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTrasladosPendientes(int pvId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT t.*, p.codigo as prod_codigo, p.nombre as prod_nombre,
+             o.nombre as origen_nombre, o.codigo as origen_codigo
+      FROM transferencias t
+      LEFT JOIN productos p ON t.producto_id = p.id
+      LEFT JOIN puntos_venta o ON t.origen_id = o.id
+      WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
+      ORDER BY t.codigo ASC, p.codigo ASC
+    ''', [pvId]);
+  }
+
+  Future<void> recibirTraslado({
+    required String codigo,
+    required int destinoId,
+    required List<Map<String, dynamic>> itemsConCantidad,
+  }) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    for (var item in itemsConCantidad) {
+      final id = item['id'] as int;
+      final cantRecibida = item['cantidad_recibida'] as int;
+      final prodId = item['producto_id'] as int;
+
+      await db.update('transferencias', {
+        'cantidad_recibida': cantRecibida,
+        'estado': 'RECIBIDO',
+      }, where: 'id = ?', whereArgs: [id]);
+
+      final existente = await db.query('inventario',
+          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+          whereArgs: [prodId, destinoId, hoy]);
+
+      if (existente.isEmpty) {
+        await db.insert('inventario', {
+          'producto_id': prodId,
+          'punto_venta_id': destinoId,
+          'stock': cantRecibida,
+          'fecha': hoy,
+        });
+      } else {
+        final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
+        await db.update('inventario', {'stock': actual + cantRecibida},
+            where: 'id = ?', whereArgs: [existente.first['id']]);
+      }
+    }
+  }
+
+  Future<void> ejecutarDesmedroGlobal(int pvId, int usuarioId) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    final stock = await db.query('inventario',
+        where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
+
+    int totalDesmedrado = 0;
+    for (var s in stock) {
+      final cant = (s['stock'] as num?)?.toInt() ?? 0;
+      totalDesmedrado += cant;
+      await db.update('inventario', {'stock': 0},
+          where: 'id = ?', whereArgs: [s['id']]);
+    }
+
+    await db.insert('auditoria_cambios', {
+      'fecha': DateTime.now().toIso8601String(),
+      'usuario_id': usuarioId,
+      'usuario_nombre': 'Sistema',
+      'tabla_afectada': 'inventario',
+      'accion': 'DESMEDRO_GLOBAL',
+      'registro_id': pvId,
+      'datos_anteriores': 'Stock: $totalDesmedrado uds',
+      'datos_nuevos': 'Stock: 0 uds',
+    });
   }
 }
