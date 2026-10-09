@@ -23,7 +23,7 @@ class _VentaScreenState extends State<VentaScreen> {
   static const int CANT_DEFECTO = 6;
 
   List<Map<String, dynamic>> _categorias = [];
-  Map<int, Map<int, double>> _preciosPorProducto = {};
+  Map<int, double> _preciosPorProducto = {};
   bool _cargando = true;
 
   int get _pvId {
@@ -35,37 +35,37 @@ class _VentaScreenState extends State<VentaScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarDatos();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cargarDatos();
+    });
   }
 
   Future<void> _cargarDatos() async {
-    setState(() => _cargando = true);
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final cats = await db.getCategoriasProducto();
     final productos = db.products;
 
-    // Cargar precios de todos los productos para este PV
-    final Map<int, Map<int, double>> precios = {};
+    final Map<int, double> precios = {};
     for (var p in productos) {
       final listaPrecios = await db.getPreciosDeProducto(p['id'] as int);
       final pvPrecio = listaPrecios.firstWhere(
         (pr) => pr['punto_venta_id'] == _pvId,
         orElse: () => {'precio': 2.0},
       );
-      precios[p['id'] as int] = {
-        _pvId: (pvPrecio['precio'] as num).toDouble(),
-      };
+      precios[p['id'] as int] = (pvPrecio['precio'] as num).toDouble();
     }
 
-    setState(() {
-      _categorias = cats;
-      _preciosPorProducto = precios;
-      _cargando = false;
-    });
+    if (mounted) {
+      setState(() {
+        _categorias = cats;
+        _preciosPorProducto = precios;
+        _cargando = false;
+      });
+    }
   }
 
   double _precioProducto(int productoId) {
-    return _preciosPorProducto[productoId]?[_pvId] ?? 2.0;
+    return _preciosPorProducto[productoId] ?? 2.0;
   }
 
   void _agregarAlCarrito(Map<String, dynamic> producto) {
@@ -115,13 +115,13 @@ class _VentaScreenState extends State<VentaScreen> {
   double get _igvCalc => total - _subtotalCalc;
 
   void _enviarWSP() async {
-    String texto = "🥐 *DESAYUNOS EL TONEL*\nPedido:\n";
+    String texto = "DESAYUNOS EL TONEL\nPedido:\n";
     for (var item in carrito) {
-      texto += "• ${item['qty']}x ${item['nombre']} (S/.${item['price']})\n";
+      texto += "- ${item['qty']}x ${item['nombre']} (S/.${item['price']})\n";
     }
     texto += "\nSubtotal: S/. ${_subtotalCalc.toStringAsFixed(2)}";
     texto += "\nIGV (18%): S/. ${_igvCalc.toStringAsFixed(2)}";
-    texto += "\n💰 *TOTAL: S/. ${total.toStringAsFixed(2)}*";
+    texto += "\nTOTAL: S/. ${total.toStringAsFixed(2)}";
     texto += "\nPagado con: ${tipoPago.toUpperCase()}";
     final Uri url = Uri.parse("whatsapp://send?text=${Uri.encodeComponent(texto)}");
     if (await canLaunchUrl(url)) {
@@ -169,7 +169,8 @@ class _VentaScreenState extends State<VentaScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: Colors.black,
-          title: Text('VENTA EXITOSA', style: TextStyle(color: Colors.green, fontFamily: 'CourierNew')),
+          title: Text('VENTA EXITOSA',
+              style: TextStyle(color: Colors.green, fontFamily: 'CourierNew')),
           content: Text(
             'Total: S/ ${total.toStringAsFixed(2)}',
             style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
@@ -225,7 +226,6 @@ class _VentaScreenState extends State<VentaScreen> {
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          // ─── FILA DE CATEGORÍAS ───
           Container(
             height: 55,
             child: ListView.builder(
@@ -239,8 +239,11 @@ class _VentaScreenState extends State<VentaScreen> {
                 return Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   child: ElevatedButton(
-                    onPressed: () => setState(() => categoriaSeleccionada = cat['id'] as int),
-                    child: Text(abrev, style: TextStyle(fontFamily: 'CourierNew', fontWeight: FontWeight.bold)),
+                    onPressed: () =>
+                        setState(() => categoriaSeleccionada = cat['id'] as int),
+                    child: Text(abrev,
+                        style: TextStyle(
+                            fontFamily: 'CourierNew', fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: activa ? Colors.orange : Colors.yellow,
                       foregroundColor: Colors.black,
@@ -251,7 +254,6 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ),
 
-          // ─── LISTA DE PRODUCTOS ───
           Expanded(
             flex: 3,
             child: ListView.builder(
@@ -263,11 +265,17 @@ class _VentaScreenState extends State<VentaScreen> {
                   dense: true,
                   title: Text(
                     prod['nombre'],
-                    style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'CourierNew',
+                        fontSize: 13),
                   ),
                   subtitle: Text(
-                    '${prod['codigo']} · S/ ${precio.toStringAsFixed(2)}',
-                    style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 11),
+                    '${prod['codigo']} - S/ ${precio.toStringAsFixed(2)}',
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontFamily: 'CourierNew',
+                        fontSize: 11),
                   ),
                   trailing: IconButton(
                     icon: Icon(Icons.add_circle, color: Colors.yellow),
@@ -278,7 +286,6 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ),
 
-          // ─── CARRITO VISIBLE ───
           Container(
             constraints: BoxConstraints(maxHeight: 150),
             color: Color(0xFF1A1A1A),
@@ -286,7 +293,10 @@ class _VentaScreenState extends State<VentaScreen> {
                 ? Padding(
                     padding: EdgeInsets.all(15),
                     child: Text('Carrito vacío',
-                        style: TextStyle(color: Colors.white38, fontFamily: 'CourierNew', fontSize: 12)),
+                        style: TextStyle(
+                            color: Colors.white38,
+                            fontFamily: 'CourierNew',
+                            fontSize: 12)),
                   )
                 : ListView.builder(
                     itemCount: carrito.length,
@@ -296,29 +306,38 @@ class _VentaScreenState extends State<VentaScreen> {
                         dense: true,
                         title: Text(
                           '${item['nombre']}',
-                          style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'CourierNew',
+                              fontSize: 12),
                         ),
                         subtitle: Text(
                           '${item['qty']}x S/ ${(item['price'] as num).toStringAsFixed(2)} = S/ ${((item['price'] as num) * (item['qty'] as num)).toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 11),
+                          style: TextStyle(
+                              color: Colors.yellow,
+                              fontFamily: 'CourierNew',
+                              fontSize: 11),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: Icon(Icons.remove, color: Colors.orange, size: 18),
+                              icon: Icon(Icons.remove,
+                                  color: Colors.orange, size: 18),
                               onPressed: () => _cambiarCantidad(i, -1),
                               padding: EdgeInsets.zero,
                               constraints: BoxConstraints(),
                             ),
                             IconButton(
-                              icon: Icon(Icons.add, color: Colors.green, size: 18),
+                              icon: Icon(Icons.add,
+                                  color: Colors.green, size: 18),
                               onPressed: () => _cambiarCantidad(i, 1),
                               padding: EdgeInsets.zero,
                               constraints: BoxConstraints(),
                             ),
                             IconButton(
-                              icon: Icon(Icons.close, color: Colors.red, size: 18),
+                              icon: Icon(Icons.close,
+                                  color: Colors.red, size: 18),
                               onPressed: () => _quitarDelCarrito(i),
                               padding: EdgeInsets.zero,
                               constraints: BoxConstraints(),
@@ -330,37 +349,60 @@ class _VentaScreenState extends State<VentaScreen> {
                   ),
           ),
 
-          // ─── PANEL INFERIOR DE COBRO ───
           Container(
             color: Colors.grey[900],
             padding: EdgeInsets.all(12),
             child: Column(
               children: [
-                // Desglose IGV
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Subtotal:', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11)),
-                    Text('S/ ${_subtotalCalc.toStringAsFixed(2)}', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11)),
+                    Text('Subtotal:',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
+                    Text('S/ ${_subtotalCalc.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
                   ],
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('IGV (18%):', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11)),
-                    Text('S/ ${_igvCalc.toStringAsFixed(2)}', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11)),
+                    Text('IGV (18%):',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
+                    Text('S/ ${_igvCalc.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
                   ],
                 ),
                 Divider(color: Colors.yellow, height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('TOTAL:', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text('S/ ${total.toStringAsFixed(2)}', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text('TOTAL:',
+                        style: TextStyle(
+                            color: Colors.yellow,
+                            fontFamily: 'CourierNew',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
+                    Text('S/ ${total.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            color: Colors.yellow,
+                            fontFamily: 'CourierNew',
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
 
-                // Nombre cliente (solo crédito)
                 if (tipoPago == 'credito')
                   Padding(
                     padding: EdgeInsets.only(top: 8),
@@ -371,27 +413,33 @@ class _VentaScreenState extends State<VentaScreen> {
                         labelStyle: TextStyle(color: Colors.yellow),
                         isDense: true,
                       ),
-                      style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                      style: TextStyle(
+                          color: Colors.white, fontFamily: 'CourierNew'),
                     ),
                   ),
 
                 SizedBox(height: 8),
 
-                // Chips de pago
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ChoiceChip(
-                      label: Text('CONTADO', style: TextStyle(fontFamily: 'CourierNew', fontSize: 12)),
+                      label: Text('CONTADO',
+                          style: TextStyle(
+                              fontFamily: 'CourierNew', fontSize: 12)),
                       selected: tipoPago == 'contado',
-                      onSelected: (val) => setState(() => tipoPago = 'contado'),
+                      onSelected: (val) =>
+                          setState(() => tipoPago = 'contado'),
                       selectedColor: Colors.green,
                       labelStyle: TextStyle(color: Colors.black),
                     ),
                     ChoiceChip(
-                      label: Text('CRÉDITO', style: TextStyle(fontFamily: 'CourierNew', fontSize: 12)),
+                      label: Text('CRÉDITO',
+                          style: TextStyle(
+                              fontFamily: 'CourierNew', fontSize: 12)),
                       selected: tipoPago == 'credito',
-                      onSelected: (val) => setState(() => tipoPago = 'credito'),
+                      onSelected: (val) =>
+                          setState(() => tipoPago = 'credito'),
                       selectedColor: Colors.orange,
                       labelStyle: TextStyle(color: Colors.black),
                     ),
