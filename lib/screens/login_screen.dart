@@ -1,77 +1,192 @@
-import 'package:flutter/material.dart'; // REM: Librería principal de interfaz gráfica de Flutter
-import 'package:provider/provider.dart'; // REM: Gestor de estado para acceder a servicios
-import '../services/auth_service.dart'; // REM: Servicio de autenticación que valida credenciales
-import 'home_screen.dart'; // REM: Pantalla de menú principal a la que se irá tras el login
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/database_helper.dart';
+import 'home_screen.dart';
 
-class LoginScreen extends StatefulWidget { // REM: Define la pantalla de login como un widget con estado mutable
+class LoginScreen extends StatefulWidget {
   @override
-  _LoginScreenState createState() => _LoginScreenState(); // REM: Crea el estado interno de esta pantalla
+  _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> { // REM: Lógica interna y estado del login
-  final TextEditingController _dniCtrl = TextEditingController(); // REM: Controlador para el campo de texto del DNI
-  final TextEditingController _passCtrl = TextEditingController(); // REM: Controlador para el campo de texto de la contraseña
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _dniCtrl = TextEditingController();
+  final TextEditingController _passCtrl = TextEditingController();
+  bool _cargando = false;
 
-  void _login() async { // REM: Función asíncrona que se ejecuta al presionar el botón ingresar
-    final auth = Provider.of<AuthService>(context, listen: false); // REM: Obtiene el servicio de auth sin escuchar cambios de estado
-    bool success = await auth.login(_dniCtrl.text.trim(), _passCtrl.text.trim()); // REM: Intenta iniciar sesión con los datos limpios (sin espacios)
-    
-    if (success) { // REM: Si el login fue exitoso (devuelve true)
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen())); // REM: Reemplaza esta pantalla por el Menú Principal (no se puede volver atrás con el botón de retroceso)
-    } else { // REM: Si el login falló (devuelve false)
-      ScaffoldMessenger.of(context).showSnackBar( // REM: Muestra un mensaje emergente en la parte inferior
-        SnackBar(content: Text('DNI o Contraseña incorrectos'), backgroundColor: Colors.red) // REM: Texto de error con fondo rojo
+  String get _hoy => DateTime.now().toIso8601String().split('T')[0];
+
+  String get _diaSemana {
+    final dias = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
+    return dias[DateTime.now().weekday - 1];
+  }
+
+  String get _horaActual {
+    final n = DateTime.now();
+    return '${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}';
+  }
+
+  bool _estaEnHorario(String ini, String fin) {
+    return _horaActual.compareTo(ini) >= 0 && _horaActual.compareTo(fin) <= 0;
+  }
+
+  void _mostrarDialogo(String titulo, String mensaje, Color colorTitulo) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.black,
+        title: Text(titulo,
+            style: TextStyle(color: colorTitulo, fontFamily: 'CourierNew', fontSize: 16)),
+        content: Text(mensaje,
+            style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('ENTENDIDO', style: TextStyle(color: Colors.yellow)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _login() async {
+    if (_dniCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
+      _mostrarDialogo('FALTAN DATOS', 'Ingrese DNI y contraseña', Colors.orange);
+      return;
+    }
+
+    setState(() => _cargando = true);
+
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final db = Provider.of<DatabaseHelper>(context, listen: false);
+
+    bool success = await auth.login(_dniCtrl.text.trim(), _passCtrl.text.trim());
+
+    if (!success) {
+      setState(() => _cargando = false);
+      _mostrarDialogo('ERROR', 'DNI o Contraseña incorrectos', Colors.red);
+      return;
+    }
+
+    final usuario = auth.currentUser!;
+    final rol = usuario['rol'] as String?;
+
+    if (rol == 'VENDEDOR') {
+      if (_diaSemana == 'dom') {
+        await auth.logout();
+        setState(() => _cargando = false);
+        _mostrarDialogo(
+          'HOY NO HAY LABOR',
+          'Los domingos el negocio no opera.\n\nVuelve el lunes.',
+          Colors.orange,
+        );
+        return;
+      }
+
+      if (!_estaEnHorario('03:00', '11:00')) {
+        await auth.logout();
+        setState(() => _cargando = false);
+        _mostrarDialogo(
+          'FUERA DE HORARIO',
+          'El horario de operación es de 03:00 a 11:00.\n\nHora actual: $_horaActual',
+          Colors.red,
+        );
+        return;
+      }
+
+      final asignaciones = await db.consultar(
+        'asignaciones_diarias',
+        where: 'usuario_id = ? AND fecha = ? AND estado = ?',
+        whereArgs: [usuario['id'], _hoy, 'ACTIVO'],
+      );
+
+      if (asignaciones.isEmpty) {
+        await auth.logout();
+        setState(() => _cargando = false);
+        _mostrarDialogo(
+          'SIN ASIGNACIÓN',
+          'No estás asignado para trabajar hoy.\n\nContacta al administrador.',
+          Colors.red,
+        );
+        return;
+      }
+    }
+
+    setState(() => _cargando = false);
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
       );
     }
   }
 
   @override
-  Widget build(BuildContext context) { // REM: Método que construye la interfaz visual de la pantalla
-    return Scaffold( // REM: Estructura básica de una pantalla en Flutter
-      backgroundColor: Colors.black, // REM: Fondo negro absoluto (Estilo Troglodita)
-      body: Center( // REM: Centra todo el contenido horizontal y verticalmente
-        child: Padding( // REM: Añade espacio interno para que no pegue a los bordes
-          padding: EdgeInsets.all(30), // REM: 30 píxeles de margen en todos los lados
-          child: Column( // REM: Organiza los elementos hijos en una columna vertical
-            mainAxisAlignment: MainAxisAlignment.center, // REM: Centra los elementos verticalmente en el espacio disponible
-            children: [
-              Text( // REM: Título principal de la aplicación
-                'DESAYUNOS EL TONEL', 
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 28, fontWeight: FontWeight.bold) // REM: Texto blanco, fuente Courier, grande y negrita
-              ),
-              SizedBox(height: 40), // REM: Espacio vacío vertical de 40 píxeles
-              TextField( // REM: Campo de entrada para el DNI
-                controller: _dniCtrl, // REM: Vincula este campo al controlador _dniCtrl
-                keyboardType: TextInputType.number, // REM: Muestra el teclado numérico del celular
-                decoration: InputDecoration(
-                  labelText: 'DNI', // REM: Etiqueta flotante
-                  labelStyle: TextStyle(color: Colors.yellow), // REM: Color amarillo para la etiqueta
-                  border: OutlineInputBorder() // REM: Borde rectangular alrededor del campo
-                ), 
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew') // REM: Texto escrito en blanco y fuente Courier
-              ),
-              SizedBox(height: 20), // REM: Espacio vacío vertical de 20 píxeles
-              TextField( // REM: Campo de entrada para la contraseña
-                controller: _passCtrl, // REM: Vincula este campo al controlador _passCtrl
-                obscureText: true, // REM: Oculta los caracteres escritos (puntos o asteriscos)
-                decoration: InputDecoration(
-                  labelText: 'CONTRASEÑA', // REM: Etiqueta flotante
-                  labelStyle: TextStyle(color: Colors.yellow), // REM: Color amarillo para la etiqueta
-                  border: OutlineInputBorder() // REM: Borde rectangular
-                ), 
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew') // REM: Texto escrito en blanco y fuente Courier
-              ),
-              SizedBox(height: 30), // REM: Espacio vacío vertical de 30 píxeles
-              ElevatedButton( // REM: Botón de acción principal
-                onPressed: _login, // REM: Ejecuta la función _login al ser presionado
-                child: Text('INGRESAR'), // REM: Texto dentro del botón
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50), // REM: Ancho infinito (ocupa todo el ancho) y alto de 50 píxeles
-                  backgroundColor: Colors.yellow, // REM: Fondo amarillo
-                  foregroundColor: Colors.black // REM: Texto negro
-                )
-              )
-            ],
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(30),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'DESAYUNOS EL TONEL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'CourierNew',
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Sistema de Gestión',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontFamily: 'CourierNew',
+                    fontSize: 12,
+                  ),
+                ),
+                SizedBox(height: 40),
+                TextField(
+                  controller: _dniCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'DNI',
+                    labelStyle: TextStyle(color: Colors.yellow),
+                    border: OutlineInputBorder(),
+                  ),
+                  style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                ),
+                SizedBox(height: 20),
+                TextField(
+                  controller: _passCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'CONTRASEÑA',
+                    labelStyle: TextStyle(color: Colors.yellow),
+                    border: OutlineInputBorder(),
+                  ),
+                  style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                ),
+                SizedBox(height: 30),
+                _cargando
+                    ? CircularProgressIndicator(color: Colors.yellow)
+                    : ElevatedButton(
+                        onPressed: _login,
+                        child: Text('INGRESAR'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: Size(double.infinity, 50),
+                          backgroundColor: Colors.yellow,
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+              ],
+            ),
           ),
         ),
       ),
