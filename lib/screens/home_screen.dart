@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'venta_screen.dart';
 import 'quiebres_screen.dart';
+import 'pv_importar_entrada_screen.dart';
 import 'transferencia_screen.dart';
 import 'recepcion_traslados_screen.dart';
 import 'cierre_caja_screen.dart';
@@ -10,6 +11,7 @@ import 'rentabilidad_screen.dart';
 import 'cxc_screen.dart';
 import 'admin_personal_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
+import 'admin_importar_batch_screen.dart';
 import 'compra_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 
@@ -22,8 +24,10 @@ class HomeScreen extends StatelessWidget {
     final List<Map<String, dynamic>> botones = [
       {'titulo': 'NUEVA VENTA', 'screen': VentaScreen()},
       {'titulo': 'QUIEBRES', 'screen': QuiebresScreen()},
+      {'titulo': 'RECIBIR ENTRADA', 'screen': PvImportarEntradaScreen()},
       if (isAdmin) ...[
         {'titulo': 'ACTIVAR VENDEDOR', 'screen': AdminActivarVendedorScreen()},
+        {'titulo': 'IMPORTAR BATCH', 'screen': AdminImportarBatchScreen()},
         {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
         {'titulo': 'GESTIÓN PERSONAL', 'screen': AdminPersonalScreen()},
         {'titulo': 'CIERRE DE CAJA', 'screen': CierreCajaScreen()},
@@ -41,21 +45,25 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
-      body: Padding(
-        padding: EdgeInsets.all(8),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 1.15,
-          children: [
-            ...botones.map((b) => _btnCuadrado(
-              context,
-              b['titulo'] as String,
-              b['screen'] as Widget,
-            )),
-            _btnSalir(context, auth),
-          ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(8),
+          child: GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1.15,
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            children: [
+              ...botones.map((b) => _btnCuadrado(
+                context,
+                b['titulo'] as String,
+                b['screen'] as Widget,
+              )),
+              _btnSalir(context, auth),
+            ],
+          ),
         ),
       ),
     );
@@ -84,7 +92,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.black,
                   fontFamily: 'CourierNew',
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 12,
                 ),
               ),
             ),
