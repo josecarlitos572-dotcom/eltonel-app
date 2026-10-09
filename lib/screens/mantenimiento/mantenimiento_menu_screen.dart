@@ -5,6 +5,7 @@ import 'personal_screen.dart';
 import 'clientes_screen.dart';
 import 'categorias_gasto_screen.dart';
 import 'parametros_screen.dart';
+import 'puntos_venta_screen.dart';
 
 class MantenimientoMenuScreen extends StatelessWidget {
   @override
@@ -19,6 +20,8 @@ class MantenimientoMenuScreen extends StatelessWidget {
               () => _ir(context, ProductosScreen())),
           _boton(context, 'CATEGORÍAS DE PRODUCTO', Icons.category,
               () => _ir(context, CategoriasProductoScreen())),
+          _boton(context, 'PUNTOS DE VENTA', Icons.store,
+              () => _ir(context, PuntosVentaScreen())),
           _boton(context, 'PERSONAL', Icons.people,
               () => _ir(context, PersonalScreen())),
           _boton(context, 'CLIENTES', Icons.person_outline,
@@ -41,16 +44,16 @@ class MantenimientoMenuScreen extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 6),
       child: SizedBox(
         width: double.infinity,
-        height: 70,
+        height: 65,
         child: ElevatedButton.icon(
           onPressed: accion,
-          icon: Icon(icono, color: Colors.black, size: 32),
+          icon: Icon(icono, color: Colors.black, size: 28),
           label: Text(
             texto,
             style: TextStyle(
               fontFamily: 'CourierNew',
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 14,
             ),
             textAlign: TextAlign.center,
           ),
