@@ -13,6 +13,7 @@ import 'admin_personal_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
 import 'admin_importar_batch_screen.dart';
 import 'admin_dashboard_screen.dart';
+import 'admin_generar_batch_screen.dart';
 import 'compra_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 
@@ -30,6 +31,7 @@ class HomeScreen extends StatelessWidget {
         {'titulo': 'DASHBOARD', 'screen': AdminDashboardScreen()},
         {'titulo': 'ACTIVAR VENDEDOR', 'screen': AdminActivarVendedorScreen()},
         {'titulo': 'IMPORTAR BATCH', 'screen': AdminImportarBatchScreen()},
+        {'titulo': 'GENERAR BATCH', 'screen': AdminGenerarBatchScreen()},
         {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
         {'titulo': 'GESTIÓN PERSONAL', 'screen': AdminPersonalScreen()},
         {'titulo': 'CIERRE DE CAJA', 'screen': CierreCajaScreen()},
