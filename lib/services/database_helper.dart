@@ -492,4 +492,71 @@ class DatabaseHelper extends ChangeNotifier {
       LEFT JOIN productos p ON t.producto_id = p.id
       LEFT JOIN puntos_venta o ON t.origen_id = o.id
       WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
-      ORDER BY t.codigo ASC, p.codigo ASC
+            ORDER BY t.codigo ASC, p.codigo ASC
+    ''', [pvId]);
+  }
+
+  Future<void> recibirTraslado({
+    required String codigo,
+    required int destinoId,
+    required List<Map<String, dynamic>> itemsConCantidad,
+  }) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    for (var item in itemsConCantidad) {
+      final id = item['id'] as int;
+      final cantRecibida = item['cantidad_recibida'] as int;
+      final prodId = item['producto_id'] as int;
+
+      await db.update('transferencias', {
+        'cantidad_recibida': cantRecibida,
+        'estado': 'RECIBIDO',
+      }, where: 'id = ?', whereArgs: [id]);
+
+      final existente = await db.query('inventario',
+          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+          whereArgs: [prodId, destinoId, hoy]);
+
+      if (existente.isEmpty) {
+        await db.insert('inventario', {
+          'producto_id': prodId,
+          'punto_venta_id': destinoId,
+          'stock': cantRecibida,
+          'fecha': hoy,
+        });
+      } else {
+        final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
+        await db.update('inventario', {'stock': actual + cantRecibida},
+            where: 'id = ?', whereArgs: [existente.first['id']]);
+      }
+    }
+  }
+
+  Future<void> ejecutarDesmedroGlobal(int pvId, int usuarioId) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    final stock = await db.query('inventario',
+        where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
+
+    int totalDesmedrado = 0;
+    for (var s in stock) {
+      final cant = (s['stock'] as num?)?.toInt() ?? 0;
+      totalDesmedrado += cant;
+      await db.update('inventario', {'stock': 0},
+          where: 'id = ?', whereArgs: [s['id']]);
+    }
+
+    await db.insert('auditoria_cambios', {
+      'fecha': DateTime.now().toIso8601String(),
+      'usuario_id': usuarioId,
+      'usuario_nombre': 'Sistema',
+      'tabla_afectada': 'inventario',
+      'accion': 'DESMEDRO_GLOBAL',
+      'registro_id': pvId,
+      'datos_anteriores': 'Stock: $totalDesmedrado uds',
+      'datos_nuevos': 'Stock: 0 uds',
+    });
+  }
+}
