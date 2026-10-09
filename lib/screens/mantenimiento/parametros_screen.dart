@@ -36,11 +36,7 @@ class _ParametrosScreenState extends State<ParametrosScreen> {
         backgroundColor: Colors.black,
         title: Text(
           'EDITAR PARÁMETRO',
-          style: TextStyle(
-            color: Colors.yellow,
-            fontFamily: 'CourierNew',
-            fontSize: 16,
-          ),
+          style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 16),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -48,13 +44,14 @@ class _ParametrosScreenState extends State<ParametrosScreen> {
           children: [
             Text(
               'Clave: ${param['clave']}',
-              style: TextStyle(
-                color: Colors.white70,
-                fontFamily: 'CourierNew',
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 12),
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 4),
+            Text(
+              '${param['descripcion'] ?? ''}',
+              style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 10),
+            ),
+            SizedBox(height: 12),
             TextField(
               controller: valorCtrl,
               decoration: InputDecoration(labelText: 'Valor'),
@@ -64,28 +61,77 @@ class _ParametrosScreenState extends State<ParametrosScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('CANCELAR', style: TextStyle(color: Colors.white)),
-          ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('CANCELAR', style: TextStyle(color: Colors.white))),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('GUARDAR', style: TextStyle(color: Colors.yellow)),
-          ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('GUARDAR', style: TextStyle(color: Colors.yellow))),
         ],
       ),
     );
 
     if (resultado == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.setParametro(param['clave'], valorCtrl.text.trim());
+      await db.setParametro(param['clave'] as String, valorCtrl.text.trim());
       _cargar();
+    }
+  }
+
+  String _etiquetaClave(String clave) {
+    switch (clave) {
+      case 'empresa_nombre':
+        return 'NOMBRE DE LA EMPRESA';
+      case 'empresa_ruc':
+        return 'RUC';
+      case 'igv':
+        return 'IGV (%)';
+      case 'moneda':
+        return 'MONEDA';
+      case 'admin_whatsapp':
+        return 'WHATSAPP ADMIN';
+      case 'hora_cierre':
+        return 'HORA DE CIERRE';
+      case 'inactividad_minutos':
+        return 'INACTIVIDAD (min)';
+      case 'version_bd':
+        return 'VERSIÓN BD';
+      default:
+        return clave.toUpperCase();
+    }
+  }
+
+  IconData _iconoClave(String clave) {
+    switch (clave) {
+      case 'empresa_nombre':
+        return Icons.business;
+      case 'empresa_ruc':
+        return Icons.badge;
+      case 'igv':
+        return Icons.percent;
+      case 'moneda':
+        return Icons.attach_money;
+      case 'admin_whatsapp':
+        return Icons.phone;
+      case 'hora_cierre':
+        return Icons.schedule;
+      case 'inactividad_minutos':
+        return Icons.timer;
+      case 'version_bd':
+        return Icons.storage;
+      default:
+        return Icons.settings;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('PARÁMETROS DEL SISTEMA')),
+      appBar: AppBar(
+        title: Text('PARÁMETROS DEL SISTEMA'),
+        actions: [
+          IconButton(icon: Icon(Icons.refresh), onPressed: _cargar),
+        ],
+      ),
       backgroundColor: Colors.black,
       body: _cargando
           ? Center(child: CircularProgressIndicator(color: Colors.yellow))
@@ -93,37 +139,16 @@ class _ParametrosScreenState extends State<ParametrosScreen> {
               itemCount: _parametros.length,
               itemBuilder: (context, i) {
                 final p = _parametros[i];
+                final clave = p['clave'] as String? ?? '';
                 return ListTile(
-                  leading: Icon(Icons.settings, color: Colors.yellow),
+                  leading: Icon(_iconoClave(clave), color: Colors.yellow),
                   title: Text(
-                    p['clave'] ?? '',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'CourierNew',
-                      fontWeight: FontWeight.bold,
-                    ),
+                    _etiquetaClave(clave),
+                    style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13),
                   ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Valor: ${p['valor'] ?? ''}',
-                        style: TextStyle(
-                          color: Colors.yellow,
-                          fontFamily: 'CourierNew',
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (p['descripcion'] != null)
-                        Text(
-                          p['descripcion'] as String,
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontFamily: 'CourierNew',
-                            fontSize: 10,
-                          ),
-                        ),
-                    ],
+                  subtitle: Text(
+                    'Valor: ${p['valor'] ?? ''}',
+                    style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 12),
                   ),
                   trailing: IconButton(
                     icon: Icon(Icons.edit, color: Colors.yellow),
