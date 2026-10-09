@@ -511,37 +511,4 @@ class DatabaseHelper extends ChangeNotifier {
           'fecha': hoy,
         });
       } else {
-        final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
-        await db.update('inventario', {'stock': actual + cantRecibida},
-            where: 'id = ?', whereArgs: [existente.first['id']]);
-      }
-    }
-  }
-
-  Future<void> ejecutarDesmedroGlobal(int pvId, int usuarioId) async {
-    final db = await database;
-    final hoy = DateTime.now().toIso8601String().split('T')[0];
-
-    final stock = await db.query('inventario',
-        where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
-
-    int totalDesmedrado = 0;
-    for (var s in stock) {
-      final cant = (s['stock'] as num?)?.toInt() ?? 0;
-      totalDesmedrado += cant;
-      await db.update('inventario', {'stock': 0},
-          where: 'id = ?', whereArgs: [s['id']]);
-    }
-
-    await db.insert('auditoria_cambios', {
-      'fecha': DateTime.now().toIso8601String(),
-      'usuario_id': usuarioId,
-      'usuario_nombre': 'Sistema',
-      'tabla_afectada': 'inventario',
-      'accion': 'DESMEDRO_GLOBAL',
-      'registro_id': pvId,
-      'datos_anteriores': 'Stock: $totalDesmedrado uds',
-      'datos_nuevos': 'Stock: 0 uds',
-    });
-  }
-}
+        final actual = (existente.first['
