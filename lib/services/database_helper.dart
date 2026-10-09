@@ -414,7 +414,22 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  TRANSFERENCIAS Y TRASLADOS (BLOQUE 6)
+  //  CUENTAS POR COBRAR
+  // ═══════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT c.*, 
+             COALESCE((SELECT SUM(monto_cobrado) FROM cobros WHERE cuenta_id = c.id), 0) as total_abonado
+      FROM cuentas_por_cobrar c
+      WHERE c.estado != 'PAGADO'
+      ORDER BY c.fecha_venta ASC
+    ''');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  TRANSFERENCIAS Y TRASLADOS
   // ═══════════════════════════════════════════════════════════
 
   Future<String> generarCodigoTransferencia(String tipo) async {
@@ -495,20 +510,4 @@ class DatabaseHelper extends ChangeNotifier {
       final prodId = item['producto_id'] as int;
 
       await db.update('transferencias', {
-        'cantidad_recibida': cantRecibida,
-        'estado': 'RECIBIDO',
-      }, where: 'id = ?', whereArgs: [id]);
-
-      final existente = await db.query('inventario',
-          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-          whereArgs: [prodId, destinoId, hoy]);
-
-      if (existente.isEmpty) {
-        await db.insert('inventario', {
-          'producto_id': prodId,
-          'punto_venta_id': destinoId,
-          'stock': cantRecibida,
-          'fecha': hoy,
-        });
-      } else {
-        final actual = (existente.first['
+        'cantidad_recibida':
