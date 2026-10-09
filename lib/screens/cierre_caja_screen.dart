@@ -34,6 +34,28 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     return auth.currentUser?['punto_venta_id'] ?? 2;
   }
 
+  String get _codigoPv {
+    switch (_pvId) {
+      case 1: return 'BASE';
+      case 2: return 'SR1';
+      case 3: return 'VR1';
+      case 4: return 'VR2';
+      default: return 'PV$_pvId';
+    }
+  }
+
+  int get _destinoTraslado {
+    if (_pvId == 2) return 1; // SR1 → BASE
+    if (_pvId == 3 || _pvId == 4) return 2; // VR1/VR2 → SR1
+    return 0;
+  }
+
+  String get _codigoDestino {
+    if (_pvId == 2) return 'BASE';
+    if (_pvId == 3 || _pvId == 4) return 'SR1';
+    return '—';
+  }
+
   Future<void> _cargarDatos() async {
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final pvId = _pvId;
@@ -84,7 +106,7 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
   double get _saldoTeorico => _saldoInicial + _totalVentas - _totalGastos;
 
-  double get _totalRetorno {
+  int get _totalRetorno {
     return _productosStock.fold(0, (sum, p) {
       return sum + ((p['stock'] as num?)?.toInt() ?? 0);
     });
@@ -103,6 +125,10 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       return;
     }
 
+    final mensajeDestino = _pvId == 1
+        ? 'Se ejecutará DESMEDRO GLOBAL (todo el stock a 0)'
+        : 'Se generará traslado automático a $_codigoDestino';
+
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -113,8 +139,8 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         content: Text(
           'Al cerrar:\n\n'
           '- Se cierra tu asignación de hoy\n'
-          '- El stock retorna a BASE (${_totalRetorno.toInt()} unidades)\n'
-          '- El stock queda en 0 para mañana\n\n'
+          '- $mensajeDestino\n'
+          '- Stock a trasladar: ${_totalRetorno.toInt()} unidades\n\n'
           '¿Continuar?',
           style: TextStyle(
               color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
@@ -137,7 +163,7 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final auth = Provider.of<AuthService>(context, listen: false);
     final pvId = _pvId;
-    final usuarioId = auth.currentUser?['id'];
+    final usuarioId = auth.currentUser?['id'] ?? 1;
 
     try {
       await db.insertar('cierres_caja', {
@@ -164,11 +190,33 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         });
       }
 
-      for (var p in _productosStock) {
-        await db.actualizar('inventario', {
-          'id': p['id'],
-          'stock': 0,
-        });
+      if (pvId == 1) {
+        await db.ejecutarDesmedroGlobal(pvId, usuarioId);
+      } else {
+        final items = _productosStock
+            .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) > 0)
+            .map((p) => {
+                  'producto_id': p['producto_id'],
+                  'cantidad': (p['stock'] as num).toInt(),
+                })
+            .toList();
+
+        if (items.isNotEmpty) {
+          await db.registrarTrasladoCompleto(
+            origenId: pvId,
+            destinoId: _destinoTraslado,
+            usuarioId: usuarioId,
+            items: items,
+            tipo: 'TRASLADO',
+          );
+        }
+
+        for (var p in _productosStock) {
+          await db.actualizar('inventario', {
+            'id': p['id'],
+            'stock': 0,
+          });
+        }
       }
 
       await db.insertar('auditoria_cambios', {
@@ -176,15 +224,27 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         'usuario_id': usuarioId,
         'usuario_nombre': auth.currentUser?['nombres'] ?? '',
         'tabla_afectada': 'cierres_caja',
-        'accion': 'CIERRE_JORNADA',
+        'accion': pvId == 1 ? 'CIERRE_Y_DESMEDRO' : 'CIERRE_Y_TRASLADO',
         'registro_id': pvId,
         'datos_anteriores': null,
-        'datos_nuevos': 'Stock reseteado a 0. Retorno: ${_totalRetorno.toInt()} uds',
+        'datos_nuevos':
+            'PV: $_codigoPv | Destino: ${pvId == 1 ? "desmedro" : _codigoDestino} | Uds: ${_totalRetorno.toInt()}',
       });
 
       if (mounted) {
-        auth.logout();
-        Navigator.pushReplacementNamed(context, '/');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(pvId == 1
+                ? 'Cierre completado con desmedro global'
+                : 'Cierre completado. Traslado a $_codigoDestino generado'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await Future.delayed(Duration(seconds: 2));
+        if (mounted) {
+          auth.logout();
+          Navigator.pushReplacementNamed(context, '/');
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,9 +264,12 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       );
     }
 
+    final esBase = _pvId == 1;
+    final destinoTexto = esBase ? 'DESMEDRO GLOBAL' : 'TRASLADO A $_codigoDestino';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('CIERRE DE CAJA'),
+        title: Text('CIERRE - $_codigoPv'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
@@ -216,12 +279,9 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _filaDato('Fecha:', _hoy),
-            _filaDato(
-                'Saldo inicial:', 'S/ ${_saldoInicial.toStringAsFixed(2)}'),
-            _filaDato(
-                'Total ventas:', 'S/ ${_totalVentas.toStringAsFixed(2)}'),
-            _filaDato(
-                'Total gastos:', 'S/ ${_totalGastos.toStringAsFixed(2)}'),
+            _filaDato('Saldo inicial:', 'S/ ${_saldoInicial.toStringAsFixed(2)}'),
+            _filaDato('Total ventas:', 'S/ ${_totalVentas.toStringAsFixed(2)}'),
+            _filaDato('Total gastos:', 'S/ ${_totalGastos.toStringAsFixed(2)}'),
             Divider(color: Colors.yellow),
             _filaDato('SALDO TEÓRICO:',
                 'S/ ${_saldoTeorico.toStringAsFixed(2)}',
@@ -265,21 +325,52 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
               style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
             ),
             SizedBox(height: 20),
-            Text('RETORNO A BASE',
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: esBase
+                    ? Colors.red.withOpacity(0.2)
+                    : Colors.orange.withOpacity(0.2),
+                border: Border.all(color: esBase ? Colors.red : Colors.orange),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(destinoTexto,
+                      style: TextStyle(
+                          color: esBase ? Colors.red : Colors.orange,
+                          fontFamily: 'CourierNew',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                  SizedBox(height: 5),
+                  Text(
+                      esBase
+                          ? 'Todo el stock sobrante se perderá (queda en 0)'
+                          : 'Todo el stock sobrante irá a $_codigoDestino',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontFamily: 'CourierNew',
+                          fontSize: 11)),
+                ],
+              ),
+            ),
+            SizedBox(height: 15),
+            Text('STOCK ACTUAL ($_codigoPv)',
                 style: TextStyle(
                     color: Colors.yellow,
                     fontFamily: 'CourierNew',
                     fontWeight: FontWeight.bold)),
             SizedBox(height: 5),
             Text(
-                '${_productosStock.length} productos · ${_totalRetorno.toInt()} unidades sin vender',
+                '${_productosStock.length} productos · ${_totalRetorno.toInt()} unidades',
                 style: TextStyle(
                     color: Colors.white70,
                     fontFamily: 'CourierNew',
                     fontSize: 12)),
             SizedBox(height: 10),
             Container(
-              constraints: BoxConstraints(maxHeight: 200),
+              constraints: BoxConstraints(maxHeight: 220),
               decoration: BoxDecoration(
                 color: Color(0xFF1A1A1A),
                 border: Border.all(color: Colors.yellow),
@@ -297,6 +388,7 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                       itemCount: _productosStock.length,
                       itemBuilder: (ctx, i) {
                         final p = _productosStock[i];
+                        final stock = (p['stock'] as num?)?.toInt() ?? 0;
                         return ListTile(
                           dense: true,
                           title: Text('${p['codigo']} ${p['nombre']}',
@@ -304,9 +396,11 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                                   color: Colors.white,
                                   fontFamily: 'CourierNew',
                                   fontSize: 12)),
-                          trailing: Text('${p['stock']}',
+                          trailing: Text('$stock',
                               style: TextStyle(
-                                  color: Colors.orange,
+                                  color: stock > 0
+                                      ? Colors.orange
+                                      : Colors.white38,
                                   fontFamily: 'CourierNew',
                                   fontWeight: FontWeight.bold)),
                         );
