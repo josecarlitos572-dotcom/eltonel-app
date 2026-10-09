@@ -17,14 +17,14 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), 'eltonel.db');
     return await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''CREATE TABLE puntos_venta (id INTEGER PRIMARY KEY, nombre TEXT, codigo TEXT UNIQUE, direccion TEXT, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE puntos_venta (id INTEGER PRIMARY KEY, nombre TEXT, codigo TEXT UNIQUE, direccion TEXT, dia_descanso TEXT, ini_vta TEXT, fin_vta TEXT, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE categorias_producto (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL, abreviatura TEXT, orden INTEGER DEFAULT 0, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE categorias_gasto (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL, limite_max REAL DEFAULT 9999, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT UNIQUE, nombre TEXT, categoria_id INTEGER, activo INTEGER DEFAULT 1)''');
@@ -46,7 +46,6 @@ class DatabaseHelper extends ChangeNotifier {
     await db.execute('''CREATE TABLE asignaciones_diarias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, punto_venta_id INTEGER, hora_inicio TEXT, hora_fin TEXT, estado TEXT DEFAULT 'ACTIVO', activado_por INTEGER)''');
     await db.execute('''CREATE TABLE parametros (clave TEXT PRIMARY KEY, valor TEXT, descripcion TEXT)''');
     await db.execute('''CREATE TABLE auditoria_cambios (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, usuario_nombre TEXT, tabla_afectada TEXT, accion TEXT, registro_id INTEGER, datos_anteriores TEXT, datos_nuevos TEXT)''');
-
     await _seedSystem(db);
   }
 
@@ -55,13 +54,26 @@ class DatabaseHelper extends ChangeNotifier {
       await db.update('categorias_gasto', {'limite_max': 2.0},
           where: 'nombre = ?', whereArgs: ['SS.HH.']);
     }
+    if (oldVersion < 11) {
+      try {
+        await db.execute('ALTER TABLE puntos_venta ADD COLUMN dia_descanso TEXT');
+      } catch (e) {}
+      try {
+        await db.execute('ALTER TABLE puntos_venta ADD COLUMN ini_vta TEXT');
+      } catch (e) {}
+      try {
+        await db.execute('ALTER TABLE puntos_venta ADD COLUMN fin_vta TEXT');
+      } catch (e) {}
+      await db.update('puntos_venta',
+          {'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
+    }
   }
 
   Future<void> _seedSystem(Database db) async {
-    await db.insert('puntos_venta', {'id': 1, 'nombre': 'LA BASE', 'codigo': 'BASE', 'direccion': ''});
-    await db.insert('puntos_venta', {'id': 2, 'nombre': 'Santa Rosa', 'codigo': 'SR1', 'direccion': ''});
-    await db.insert('puntos_venta', {'id': 3, 'nombre': 'Víctor Raúl 1', 'codigo': 'VR1', 'direccion': ''});
-    await db.insert('puntos_venta', {'id': 4, 'nombre': 'Víctor Raúl 2', 'codigo': 'VR2', 'direccion': ''});
+    await db.insert('puntos_venta', {'id': 1, 'nombre': 'LA BASE', 'codigo': 'BASE', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
+    await db.insert('puntos_venta', {'id': 2, 'nombre': 'Santa Rosa', 'codigo': 'SR1', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
+    await db.insert('puntos_venta', {'id': 3, 'nombre': 'Víctor Raúl 1', 'codigo': 'VR1', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
+    await db.insert('puntos_venta', {'id': 4, 'nombre': 'Víctor Raúl 2', 'codigo': 'VR2', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
 
     await db.insert('categorias_gasto', {'nombre': 'SS.HH.', 'limite_max': 2.0});
     await db.insert('categorias_gasto', {'nombre': 'Flete Llegada', 'limite_max': 6});
@@ -88,9 +100,9 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'igv', 'valor': '18', 'descripcion': 'Porcentaje de IGV'},
       {'clave': 'moneda', 'valor': 'S/', 'descripcion': 'Símbolo de moneda'},
       {'clave': 'admin_whatsapp', 'valor': '51999999999', 'descripcion': 'WhatsApp del admin'},
-      {'clave': 'hora_cierre', 'valor': '18:00', 'descripcion': 'Hora sugerida de cierre'},
+      {'clave': 'hora_cierre', 'valor': '11:00', 'descripcion': 'Hora sugerida de cierre'},
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
-      {'clave': 'version_bd', 'valor': '10', 'descripcion': 'Versión actual de la BD'},
+      {'clave': 'version_bd', 'valor': '11', 'descripcion': 'Versión actual de la BD'},
     ];
     for (var p in params) {
       await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -272,16 +284,11 @@ class DatabaseHelper extends ChangeNotifier {
     final db = await database;
     return await db.transaction((txn) async {
       int prodId = await txn.insert('productos', {
-        'codigo': codigo,
-        'nombre': nombre,
-        'categoria_id': categoriaId,
-        'activo': 1,
+        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId, 'activo': 1,
       });
       for (var entry in precios.entries) {
         await txn.insert('precios', {
-          'producto_id': prodId,
-          'punto_venta_id': entry.key,
-          'precio': entry.value,
+          'producto_id': prodId, 'punto_venta_id': entry.key, 'precio': entry.value,
         });
       }
       return prodId;
@@ -298,9 +305,7 @@ class DatabaseHelper extends ChangeNotifier {
     final db = await database;
     await db.transaction((txn) async {
       await txn.update('productos', {
-        'codigo': codigo,
-        'nombre': nombre,
-        'categoria_id': categoriaId,
+        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId,
       }, where: 'id = ?', whereArgs: [productoId]);
 
       for (var entry in precios.entries) {
@@ -309,9 +314,7 @@ class DatabaseHelper extends ChangeNotifier {
             whereArgs: [productoId, entry.key]);
         if (existe.isEmpty) {
           await txn.insert('precios', {
-            'producto_id': productoId,
-            'punto_venta_id': entry.key,
-            'precio': entry.value,
+            'producto_id': productoId, 'punto_venta_id': entry.key, 'precio': entry.value,
           });
         } else {
           await txn.update('precios', {'precio': entry.value},
