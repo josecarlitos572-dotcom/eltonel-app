@@ -64,13 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final totalGastos = gastos.fold(
         0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0.0));
 
-    final cierresHoy = await db.rawQuery('''
-      SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre
-      FROM cierres_caja c
-      LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id
-      WHERE c.fecha = ?
-      ORDER BY pv.id
-    ''', [_hoy]);
+    final cierresHoy = await db.consultarCierresDelDia(_hoy);
 
     int totalQ = 0;
     for (var r in resumen) {
@@ -141,7 +135,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: _tarjetaInt('QUIEBRES', _totalQuiebres, Colors.orange)),
               ],
             ),
-
             SizedBox(height: 20),
             Text('DETALLE POR PUNTO DE VENTA',
                 style: TextStyle(
@@ -150,7 +143,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     fontWeight: FontWeight.bold,
                     fontSize: 13)),
             SizedBox(height: 10),
-
             ..._resumenPorPv.map((r) {
               final cerrado = r['cerrado'] as bool;
               return Card(
@@ -198,7 +190,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               );
             }).toList(),
-
             if (_cierreHoy.isNotEmpty) ...[
               SizedBox(height: 20),
               Text('CUADRE DE CAJA DEL DÍA',
@@ -211,8 +202,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ..._cierreHoy.map((c) {
                 final diferencia =
                     (c['diferencia'] as num?)?.toDouble() ?? 0.0;
-                final colorDif =
-                    diferencia == 0 ? Colors.green : (diferencia > 0 ? Colors.orange : Colors.red);
+                final colorDif = diferencia == 0
+                    ? Colors.green
+                    : (diferencia > 0 ? Colors.orange : Colors.red);
                 return Card(
                   color: Color(0xFF1A1A1A),
                   margin: EdgeInsets.symmetric(vertical: 3),
