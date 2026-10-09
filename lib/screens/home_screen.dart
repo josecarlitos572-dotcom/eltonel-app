@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'venta_screen.dart';
+import 'quiebres_screen.dart';
 import 'transferencia_screen.dart';
 import 'recepcion_traslados_screen.dart';
 import 'cierre_caja_screen.dart';
 import 'rentabilidad_screen.dart';
 import 'cxc_screen.dart';
 import 'admin_personal_screen.dart';
+import 'admin_activar_vendedor_screen.dart';
 import 'compra_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 
@@ -15,11 +17,13 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
-    bool isAdmin = auth.currentUser?['rol'] == 'admin';
+    bool isAdmin = auth.currentUser?['rol'] == 'ADMIN';
 
     final List<Map<String, dynamic>> botones = [
       {'titulo': 'NUEVA VENTA', 'screen': VentaScreen()},
+      {'titulo': 'QUIEBRES', 'screen': QuiebresScreen()},
       if (isAdmin) ...[
+        {'titulo': 'ACTIVAR VENDEDOR', 'screen': AdminActivarVendedorScreen()},
         {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
         {'titulo': 'GESTIÓN PERSONAL', 'screen': AdminPersonalScreen()},
         {'titulo': 'CIERRE DE CAJA', 'screen': CierreCajaScreen()},
@@ -123,8 +127,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
