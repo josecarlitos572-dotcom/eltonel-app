@@ -413,10 +413,6 @@ class DatabaseHelper extends ChangeNotifier {
     return [{'ventas': totalVentas, 'gastos': totalGastos, 'utilidad': totalVentas - totalGastos}];
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  CUENTAS POR COBRAR
-  // ═══════════════════════════════════════════════════════════
-
   Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async {
     final db = await database;
     return await db.rawQuery('''
@@ -428,9 +424,16 @@ class DatabaseHelper extends ChangeNotifier {
     ''');
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  TRANSFERENCIAS Y TRASLADOS
-  // ═══════════════════════════════════════════════════════════
+  Future<List<Map<String, dynamic>>> consultarCierresDelDia(String fecha) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre
+      FROM cierres_caja c
+      LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id
+      WHERE c.fecha = ?
+      ORDER BY pv.id
+    ''', [fecha]);
+  }
 
   Future<String> generarCodigoTransferencia(String tipo) async {
     final db = await database;
@@ -492,7 +495,7 @@ class DatabaseHelper extends ChangeNotifier {
       LEFT JOIN productos p ON t.producto_id = p.id
       LEFT JOIN puntos_venta o ON t.origen_id = o.id
       WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
-            ORDER BY t.codigo ASC, p.codigo ASC
+      ORDER BY t.codigo ASC, p.codigo ASC
     ''', [pvId]);
   }
 
@@ -557,17 +560,6 @@ class DatabaseHelper extends ChangeNotifier {
       'registro_id': pvId,
       'datos_anteriores': 'Stock: $totalDesmedrado uds',
       'datos_nuevos': 'Stock: 0 uds',
-          });
-    }
-  }
- Future<List<Map<String, dynamic>>> consultarCierresDelDia(String fecha) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre
-      FROM cierres_caja c
-      LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id
-      WHERE c.fecha = ?
-      ORDER BY pv.id
-    ''', [fecha]);
+    });
   }
 }
