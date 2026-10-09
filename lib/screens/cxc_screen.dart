@@ -22,13 +22,7 @@ class _CxcScreenState extends State<CxcScreen> {
     setState(() => _cargando = true);
     final db = Provider.of<DatabaseHelper>(context, listen: false);
 
-    final cuentas = await db.rawQuery('''
-      SELECT c.*, 
-             COALESCE((SELECT SUM(monto_cobrado) FROM cobros WHERE cuenta_id = c.id), 0) as total_abonado
-      FROM cuentas_por_cobrar c
-      WHERE c.estado != 'PAGADO'
-      ORDER BY c.fecha_venta ASC
-    ''');
+    final cuentas = await db.consultarCuentasPendientes();
 
     if (mounted) {
       setState(() {
@@ -76,7 +70,11 @@ class _CxcScreenState extends State<CxcScreen> {
                   style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
               SizedBox(height: 6),
               Text('Saldo pendiente: S/ ${saldoActual.toStringAsFixed(2)}',
-                  style: TextStyle(color: Colors.orange, fontFamily: 'CourierNew', fontSize: 13, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: Colors.orange,
+                      fontFamily: 'CourierNew',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
               SizedBox(height: 12),
               TextField(
                 controller: montoCtrl,
@@ -126,7 +124,9 @@ class _CxcScreenState extends State<CxcScreen> {
 
     if (monto > saldoActual) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('El abono excede el saldo pendiente'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('El abono excede el saldo pendiente'),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -138,15 +138,14 @@ class _CxcScreenState extends State<CxcScreen> {
       final nuevoSaldo = saldoActual - monto;
       final nuevoEstado = nuevoSaldo <= 0 ? 'PAGADO' : 'PENDIENTE';
 
-      // Actualizar cuenta
       await db.actualizar('cuentas_por_cobrar', {
         'id': cuenta['id'],
-        'monto_pagado': ((cuenta['monto_pagado'] as num?)?.toDouble() ?? 0.0) + monto,
+        'monto_pagado':
+            ((cuenta['monto_pagado'] as num?)?.toDouble() ?? 0.0) + monto,
         'saldo_pendiente': nuevoSaldo,
         'estado': nuevoEstado,
       });
 
-      // Registrar cobro
       await db.insertar('cobros', {
         'cuenta_id': cuenta['id'],
         'fecha_cobro': DateTime.now().toIso8601String(),
@@ -156,7 +155,6 @@ class _CxcScreenState extends State<CxcScreen> {
         'observaciones': obsCtrl.text.trim(),
       });
 
-      // Auditoría
       await db.insertar('auditoria_cambios', {
         'fecha': DateTime.now().toIso8601String(),
         'usuario_id': auth.currentUser?['id'],
@@ -188,12 +186,12 @@ class _CxcScreenState extends State<CxcScreen> {
     if (_cargando) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: Text('CUENTAS POR COBRAR'), backgroundColor: Colors.black),
+        appBar: AppBar(
+            title: Text('CUENTAS POR COBRAR'), backgroundColor: Colors.black),
         body: Center(child: CircularProgressIndicator(color: Colors.yellow)),
       );
     }
 
-    // Calcular totales
     double totalPorCobrar = 0.0;
     double totalVencido = 0.0;
     for (var c in _cuentas) {
@@ -215,7 +213,6 @@ class _CxcScreenState extends State<CxcScreen> {
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          // Resumen superior
           Container(
             padding: EdgeInsets.all(12),
             color: Color(0xFF1A1A1A),
@@ -225,35 +222,49 @@ class _CxcScreenState extends State<CxcScreen> {
                 Column(
                   children: [
                     Text('POR COBRAR',
-                        style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 10)),
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 10)),
                     Text('S/ ${totalPorCobrar.toStringAsFixed(2)}',
-                        style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: Colors.yellow,
+                            fontFamily: 'CourierNew',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Column(
                   children: [
                     Text('VENCIDO',
-                        style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 10)),
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'CourierNew',
+                            fontSize: 10)),
                     Text('S/ ${totalVencido.toStringAsFixed(2)}',
-                        style: TextStyle(color: Colors.red, fontFamily: 'CourierNew', fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'CourierNew',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
             ),
           ),
-
-          // Lista de cuentas
           Expanded(
             child: _cuentas.isEmpty
                 ? Center(
                     child: Text('Sin cuentas pendientes',
-                        style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew')),
+                        style: TextStyle(
+                            color: Colors.white54, fontFamily: 'CourierNew')),
                   )
                 : ListView.builder(
                     itemCount: _cuentas.length,
                     itemBuilder: (ctx, i) {
                       final c = _cuentas[i];
-                      final saldo = (c['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+                      final saldo =
+                          (c['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
                       final dias = _diasAtraso(c['fecha_vencimiento'] as String?);
                       final color = _colorAlerta(saldo, dias);
 
@@ -271,18 +282,28 @@ class _CxcScreenState extends State<CxcScreen> {
                           ),
                           title: Text(
                             c['cliente_nombre'] ?? 'Sin nombre',
-                            style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'CourierNew',
+                                fontSize: 13),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Saldo: S/ ${saldo.toStringAsFixed(2)}',
-                                  style: TextStyle(color: color, fontFamily: 'CourierNew', fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: TextStyle(
+                                      color: color,
+                                      fontFamily: 'CourierNew',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold)),
                               Text(
                                 dias > 0
                                     ? 'VENCIDO hace $dias días'
                                     : 'Vence: ${c['fecha_vencimiento'] ?? '-'}',
-                                style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 10),
+                                style: TextStyle(
+                                    color: Colors.white54,
+                                    fontFamily: 'CourierNew',
+                                    fontSize: 10),
                               ),
                             ],
                           ),
