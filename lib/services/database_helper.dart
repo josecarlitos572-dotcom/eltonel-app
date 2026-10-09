@@ -557,6 +557,17 @@ class DatabaseHelper extends ChangeNotifier {
       'registro_id': pvId,
       'datos_anteriores': 'Stock: $totalDesmedrado uds',
       'datos_nuevos': 'Stock: 0 uds',
-    });
+          });
+    }
+  }
+ Future<List<Map<String, dynamic>>> consultarCierresDelDia(String fecha) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre
+      FROM cierres_caja c
+      LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id
+      WHERE c.fecha = ?
+      ORDER BY pv.id
+    ''', [fecha]);
   }
 }
