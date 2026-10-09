@@ -58,9 +58,11 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
               child: Text('CANCELAR', style: TextStyle(color: Colors.white))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
               child: Text('GUARDAR', style: TextStyle(color: Colors.yellow))),
         ],
       ),
@@ -68,7 +70,7 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
 
     if (resultado == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      final data = {
+      final Map<String, dynamic> data = {
         'nombre': nombreCtrl.text.trim(),
         'abreviatura': abrevCtrl.text.trim().toUpperCase(),
       };
@@ -88,13 +90,16 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
-        title: Text('¿Eliminar?', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
+        title: Text('¿Eliminar?',
+            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
         content: Text('Se desactivará "$nombre"',
             style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
               child: Text('NO', style: TextStyle(color: Colors.white))),
-          TextButton(onPressed: () => Navigator.pop(context, true),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
               child: Text('SÍ', style: TextStyle(color: Colors.red))),
         ],
       ),
@@ -138,9 +143,11 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(icon: Icon(Icons.edit, color: Colors.yellow),
+                      IconButton(
+                          icon: Icon(Icons.edit, color: Colors.yellow),
                           onPressed: () => _editar(categoria: c)),
-                      IconButton(icon: Icon(Icons.delete, color: Colors.red),
+                      IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _eliminar(c['id'] as int, c['nombre'] ?? '')),
                     ],
                   ),
