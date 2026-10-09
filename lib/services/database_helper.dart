@@ -343,4 +343,47 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> get products => _cachedProducts;
+
+  Future<void> registrarVenta(Map<String, dynamic> ventaData, List<Map<String, dynamic>> items) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      int ventaId = await txn.insert('ventas', ventaData);
+      for (var item in items) {
+        await txn.insert('detalle_venta', {
+          'venta_id': ventaId,
+          'producto_id': item['id'],
+          'cantidad': item['qty'],
+          'precio_unitario': item['price'],
+          'subtotal': item['qty'] * item['price'],
+        });
+        await txn.rawUpdate(
+          'UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+          [item['qty'], item['id'], ventaData['punto_venta_id'], DateTime.now().toIso8601String().split('T')[0]],
+        );
+      }
+    });
+  }
+
+  Future<void> registrarGasto(String categoria, String desc, double monto, int tieneComp) async {
+    final db = await database;
+    await db.insert('gastos_internos', {
+      'fecha': DateTime.now().toIso8601String(),
+      'categoria': categoria,
+      'descripcion': desc,
+      'monto': monto,
+      'tiene_comprobante': tieneComp,
+      'usuario_id': 1,
+    });
+    notifyListeners();
+  }
+
+  Future<List<Map<String, dynamic>>> getResumenMensual() async {
+    final db = await database;
+    String mesActual = DateTime.now().toIso8601String().substring(0, 7);
+    var ventas = await db.rawQuery('SELECT SUM(monto_total) as total FROM ventas WHERE fecha LIKE ?', ['$mesActual%']);
+    var gastos = await db.rawQuery('SELECT SUM(monto) as total FROM gastos_internos WHERE fecha LIKE ?', ['$mesActual%']);
+    double totalVentas = ventas.first['total'] == null ? 0.0 : (ventas.first['total'] as num).toDouble();
+    double totalGastos = gastos.first['total'] == null ? 0.0 : (gastos.first['total'] as num).toDouble();
+    return [{'ventas': totalVentas, 'gastos': totalGastos, 'utilidad': totalVentas - totalGastos}];
+  }
 }
