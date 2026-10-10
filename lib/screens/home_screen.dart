@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'venta_screen.dart';
 import 'quiebres_screen.dart';
 import 'pv_importar_entrada_screen.dart';
+import 'pv_solicitar_requerimiento_screen.dart';
 import 'transferencia_screen.dart';
 import 'recepcion_traslados_screen.dart';
 import 'cierre_caja_screen.dart';
@@ -14,6 +15,10 @@ import 'admin_activar_vendedor_screen.dart';
 import 'admin_importar_batch_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_generar_batch_screen.dart';
+import 'admin_gestionar_requerimientos_screen.dart';
+import 'admin_auditoria_screen.dart';
+import 'admin_backup_screen.dart';
+import 'admin_reportes_screen.dart';
 import 'compra_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 
@@ -26,18 +31,23 @@ class HomeScreen extends StatelessWidget {
     final List<Map<String, dynamic>> botones = [
       {'titulo': 'NUEVA VENTA', 'screen': VentaScreen()},
       {'titulo': 'QUIEBRES', 'screen': QuiebresScreen()},
+      {'titulo': 'SOLICITAR REQUERIMIENTO', 'screen': PvSolicitarRequerimientoScreen()},
       {'titulo': 'RECIBIR ENTRADA', 'screen': PvImportarEntradaScreen()},
       if (isAdmin) ...[
         {'titulo': 'DASHBOARD', 'screen': AdminDashboardScreen()},
+        {'titulo': 'REPORTES', 'screen': AdminReportesScreen()},
         {'titulo': 'ACTIVAR VENDEDOR', 'screen': AdminActivarVendedorScreen()},
         {'titulo': 'IMPORTAR BATCH', 'screen': AdminImportarBatchScreen()},
         {'titulo': 'GENERAR BATCH', 'screen': AdminGenerarBatchScreen()},
+        {'titulo': 'VER REQUERIMIENTOS', 'screen': AdminGestionarRequerimientosScreen()},
         {'titulo': 'ENVIAR STOCK', 'screen': TransferenciaScreen()},
         {'titulo': 'GESTIÓN PERSONAL', 'screen': AdminPersonalScreen()},
         {'titulo': 'CIERRE DE CAJA', 'screen': CierreCajaScreen()},
         {'titulo': 'MI RENTABILIDAD', 'screen': RentabilidadScreen()},
         {'titulo': 'CUENTAS X COBRAR', 'screen': CxcScreen()},
         {'titulo': 'REGISTRAR GASTO', 'screen': CompraScreen()},
+        {'titulo': 'AUDITORÍA', 'screen': AdminAuditoriaScreen()},
+        {'titulo': 'BACKUP', 'screen': AdminBackupScreen()},
         {'titulo': 'MANTENIMIENTO', 'screen': MantenimientoMenuScreen()},
       ],
       {'titulo': 'RECIBIR INICIO JORNADA', 'screen': RecepcionTrasladosScreen()},
@@ -96,7 +106,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.black,
                   fontFamily: 'CourierNew',
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
             ),
