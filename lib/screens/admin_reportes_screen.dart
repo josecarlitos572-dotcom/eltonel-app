@@ -48,7 +48,6 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
     final desde = _desde;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
 
-    // Ventas del período
     final ventas = await db2.rawQuery(
       'SELECT * FROM ventas WHERE fecha >= ? AND fecha <= ?',
       ['${desde}T00:00:00', '${hoy}T23:59:59'],
@@ -58,7 +57,6 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
       sumaVentas += (v['monto_total'] as num?)?.toDouble() ?? 0.0;
     }
 
-    // Gastos del período
     final gastos = await db2.rawQuery(
       'SELECT * FROM gastos_internos WHERE fecha >= ? AND fecha <= ?',
       ['${desde}T00:00:00', '${hoy}T23:59:59'],
@@ -68,7 +66,6 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
       sumaGastos += (g['monto'] as num?)?.toDouble() ?? 0.0;
     }
 
-    // Productos más vendidos
     final topProductos = await db2.rawQuery('''
       SELECT dv.producto_id, p.codigo, p.nombre,
              SUM(dv.cantidad) as total_cantidad,
@@ -82,7 +79,6 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
       LIMIT 10
     ''', ['${desde}T00:00:00', '${hoy}T23:59:59']);
 
-    // Quiebres por producto
     final quiebres = await db2.rawQuery('''
       SELECT q.producto_id, p.codigo, p.nombre,
              COUNT(*) as total_quiebres,
@@ -95,13 +91,11 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
       LIMIT 10
     ''', [desde, hoy]);
 
-    // Cierres del período
     final cierres = await db2.rawQuery(
       'SELECT * FROM cierres_caja WHERE fecha >= ? AND fecha <= ?',
       [desde, hoy],
     );
 
-    // Resumen por PV
     final puntos = await db.getPuntosVenta();
     final List<Map<String, dynamic>> resumenPv = [];
     for (var pv in puntos) {
@@ -164,7 +158,6 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Filtro de período
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -229,15 +222,21 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
                     backgroundColor: Colors.yellow,
                     child: Text(r['codigo'] ?? '?',
                         style: TextStyle(
-                            color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold)),
                   ),
                   title: Text(r['nombre'] ?? '',
                       style: TextStyle(
-                          color: Colors.white, fontFamily: 'CourierNew', fontSize: 11)),
+                          color: Colors.white,
+                          fontFamily: 'CourierNew',
+                          fontSize: 11)),
                   subtitle: Text(
                       '${r['cant_ventas']} tickets · ${r['quiebres']} quiebres',
                       style: TextStyle(
-                          color: Colors.white54, fontFamily: 'CourierNew', fontSize: 9)),
+                          color: Colors.white54,
+                          fontFamily: 'CourierNew',
+                          fontSize: 9)),
                   trailing: Text('S/ ${(r['ventas'] as double).toStringAsFixed(2)}',
                       style: TextStyle(
                           color: Colors.yellow,
@@ -275,7 +274,9 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
                     ),
                     title: Text('${p['codigo']} ${p['nombre']}',
                         style: TextStyle(
-                            color: Colors.white, fontFamily: 'CourierNew', fontSize: 11)),
+                            color: Colors.white,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
                     trailing: Text('${p['total_cantidad']} uds',
                         style: TextStyle(
                             color: Colors.yellow,
@@ -305,7 +306,9 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
                     leading: Icon(Icons.warning, color: Colors.orange, size: 20),
                     title: Text('${q['codigo']} ${q['nombre']}',
                         style: TextStyle(
-                            color: Colors.white, fontFamily: 'CourierNew', fontSize: 11)),
+                            color: Colors.white,
+                            fontFamily: 'CourierNew',
+                            fontSize: 11)),
                     trailing: Text('${q['total_quiebres']} veces',
                         style: TextStyle(
                             color: Colors.orange,
@@ -327,7 +330,8 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4),
       child: ChoiceChip(
-        label: Text(valor, style: TextStyle(fontFamily: 'CourierNew', fontSize: 11)),
+        label: Text(valor,
+            style: TextStyle(fontFamily: 'CourierNew', fontSize: 11)),
         selected: activo,
         onSelected: (v) {
           setState(() => _periodo = valor);
@@ -353,7 +357,9 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
         children: [
           Text(titulo,
               style: TextStyle(
-                  color: Colors.white70, fontFamily: 'CourierNew', fontSize: 9)),
+                  color: Colors.white70,
+                  fontFamily: 'CourierNew',
+                  fontSize: 9)),
           SizedBox(height: 4),
           Text('S/ ${monto.toStringAsFixed(2)}',
               style: TextStyle(
@@ -379,7 +385,9 @@ class _AdminReportesScreenState extends State<AdminReportesScreen> {
         children: [
           Text(titulo,
               style: TextStyle(
-                  color: Colors.white70, fontFamily: 'CourierNew', fontSize: 9)),
+                  color: Colors.white70,
+                  fontFamily: 'CourierNew',
+                  fontSize: 9)),
           SizedBox(height: 4),
           Text('$valor',
               style: TextStyle(
