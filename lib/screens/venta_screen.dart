@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
+import '../services/auth_service.dart';
 
 class VentaScreen extends StatefulWidget {
   @override
@@ -12,21 +13,26 @@ class _VentaScreenState extends State<VentaScreen> {
   double _total = 0.0;
   List<Map<String, dynamic>> _productos = [];
   bool _cargando = true;
-
-  // ID del punto de venta actual
-  final int _puntoVentaId = 2; 
+  int _puntoVentaId = 0;
 
   @override
   void initState() {
     super.initState();
-    _cargarProductos();
+    _inicializar();
   }
 
-  Future<void> _cargarProductos() async {
+  Future<void> _inicializar() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    
+    // Obtenemos el PV del usuario logueado. Si no, forzamos 2 (o 0 y bloqueamos).
+    final pv = auth.currentUser?['punto_venta_id_actual'] as int? ?? 2;
+    
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final prods = await db.getProductos();
+    
     if (mounted) {
       setState(() {
+        _puntoVentaId = pv;
         _productos = prods;
         _cargando = false;
       });
@@ -81,10 +87,12 @@ class _VentaScreenState extends State<VentaScreen> {
 
   Future<void> _finalizarVenta() async {
     final db = Provider.of<DatabaseHelper>(context, listen: false);
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final usuarioId = auth.currentUser?['id'] as int? ?? 1;
     
     final ventaData = {
       'cliente_id': null,
-      'usuario_id': 1,
+      'usuario_id': usuarioId,
       'punto_venta_id': _puntoVentaId,
       'fecha': DateTime.now().toIso8601String(),
       'tipo_venta': 'EFECTIVO',
@@ -136,16 +144,13 @@ class _VentaScreenState extends State<VentaScreen> {
         children: [
           Expanded(
             flex: 3,
-            child: LayoutBuilder( // Usamos LayoutBuilder para calcular la altura exacta de la fila
+            child: LayoutBuilder(
               builder: (context, constraints) {
-                // Calculamos el tamaño de la celda basado en el aspect ratio 1.5
                 final width = (constraints.maxWidth - 16 - 8) / 2; 
                 final height = width / 1.5;
-                final itemExtent = height + 8; // Altura de la celda + margen
-
+                
                 return GridView.builder(
                   padding: const EdgeInsets.all(8.0),
-                  // Aquí se ajusta el pitch para que salte de 1 fila (2 productos) a la vez
                   physics: const PageScrollPhysics(), 
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
