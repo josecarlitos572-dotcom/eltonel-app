@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ScannerScreen extends StatefulWidget {
   @override
@@ -10,79 +13,147 @@ class _ScannerScreenState extends State<ScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
     formats: [
       BarcodeFormat.pdf417, // DNI Azul
-      BarcodeFormat.code39, // Carné Extranjería
+      BarcodeFormat.code39, // Carnet Extranjería / Licencia
       BarcodeFormat.qrCode, // Licencia de Conducir
-      // MRZ no es un formato de código de barras, es texto. 
-      // mobile_scanner no lee MRZ directamente, pero podemos usar un OCR después.
     ],
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
 
   bool _procesando = false;
 
-  void _onDetect(BarcodeCapture capture) {
+  // 1. FLUJO RÁPIDO: Código de barras
+  void _onDetect(BarcodeCapture capture) async {
     if (_procesando) return;
     final barcode = capture.barcodes.first;
     final raw = barcode.rawValue;
     if (raw == null) return;
 
     setState(() => _procesando = true);
-    _controller.stop();
+    await _controller.stop();
 
-    // EL CEREBRO: Decidir qué hacer según el contenido
     Map<String, dynamic> datosCliente = {};
 
-    // 1. Intentar parsear como DNI Azul (PDF417)
     if (barcode.format == BarcodeFormat.pdf417) {
       datosCliente = _parseDNIAzul(raw);
-    } 
-    // 2. Intentar parsear como Carné de Extranjería (Code39)
-    else if (barcode.format == BarcodeFormat.code39) {
-      datosCliente = _parseCarnetExtranjeria(raw);
-    }
-    // 3. Intentar parsear como Licencia de Conducir (QR)
-    else if (barcode.format == BarcodeFormat.qrCode) {
-      datosCliente = _parseLicenciaConducir(raw);
+    } else if (barcode.format == BarcodeFormat.code39) {
+      datosCliente = {'tipo': 'CE_LICENCIA', 'numero': raw, 'nombre': 'Cliente Extranjero'};
+    } else if (barcode.format == BarcodeFormat.qrCode) {
+      datosCliente = _parseQR(raw);
     }
 
-    // Si no se pudo parsear, devolvemos el texto crudo para que el vendedor lo vea
     if (datosCliente.isEmpty) {
-      datosCliente = {'raw': raw, 'error': 'Formato no reconocido'};
+      datosCliente = {'tipo': 'DESCONOCIDO', 'raw': raw};
     }
 
     Navigator.pop(context, datosCliente);
   }
 
+  // Parser DNI Azul (Lógica de bytes)
   Map<String, dynamic> _parseDNIAzul(String raw) {
-    // Lógica de bytes del DNI peruano (1997)
-    // Según peru-dni-reader: bytes 2-9 = numero, 10-49 = apellido1, etc.
     try {
-      // La cadena raw puede tener caracteres especiales. 
-      // En la práctica, el PDF417 se lee como una cadena de bytes.
-      // Este es un parser simplificado. Para producción, usa la librería del repo.
-      return {'tipo': 'DNI_AZUL', 'raw': raw};
+      // En el DNI Azul, el PDF417 contiene los datos en posiciones específicas.
+      // Este es un parser simplificado que busca el número de DNI.
+      // El DNI empieza en el byte 2 y termina en el 10.
+      if (raw.length > 10) {
+        String dni = raw.substring(2, 10);
+        String nombre = raw.substring(90, 125).trim(); // Nombres
+        String apellido = raw.substring(10, 50).trim(); // Apellidos
+        return {
+          'tipo': 'DNI_AZUL',
+          'numero': dni,
+          'nombre': '$nombre $apellido',
+        };
+      }
     } catch (e) {
-      return {};
+      // Fallback
     }
+    return {'tipo': 'DNI_AZUL', 'numero': raw, 'nombre': 'Cliente DNI'};
   }
 
-  Map<String, dynamic> _parseCarnetExtranjeria(String raw) {
-    // El Code39 del carné de extranjería contiene el número correlativo
-    return {'tipo': 'CARNET_EXTRANJERIA', 'numero': raw};
+  Map<String, dynamic> _parseQR(String raw) {
+    // Las licencias suelen tener un QR con el número de licencia
+    return {'tipo': 'LICENCIA', 'numero': raw, 'nombre': 'Cliente Licencia'};
   }
 
-  Map<String, dynamic> _parseLicenciaConducir(String raw) {
-    // El QR de la licencia contiene un JSON o texto con el número de licencia
-    return {'tipo': 'LICENCIA', 'raw': raw};
+  // 2. FLUJO LENTO: OCR para MRZ (DNI Electrónico)
+  Future<void> _escanearMRZ() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image == null) return;
+
+    setState(() => _procesando = true);
+    await _controller.stop();
+
+    try {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+
+      // Buscar la línea MRZ (suele tener '<' y caracteres en mayúscula)
+      String mrzData = '';
+      for (TextBlock block in recognizedText.blocks) {
+        for (TextLine line in block.lines) {
+          if (line.text.contains('<') && line.text.length > 20) {
+            mrzData += line.text + '\n';
+          }
+        }
+      }
+
+      // Parseo básico de MRZ para extraer el número de documento
+      String numeroDoc = '';
+      if (mrzData.isNotEmpty) {
+        final lines = mrzData.split('\n');
+        if (lines.isNotEmpty) {
+          // La primera línea suele tener el tipo de doc y el país.
+          // La segunda línea tiene el número de documento.
+          if (lines.length > 1) {
+            final secondLine = lines[1];
+            // Los primeros 9 caracteres de la segunda línea son el número de documento
+            numeroDoc = secondLine.substring(0, 9).replaceAll('<', '').trim();
+          }
+        }
+      }
+
+      Navigator.pop(context, {
+        'tipo': 'DNI_ELECTRONICO',
+        'numero': numeroDoc,
+        'nombre': 'Cliente MRZ',
+      });
+
+    } catch (e) {
+      Navigator.pop(context, {'tipo': 'ERROR', 'error': e.toString()});
+    } finally {
+      setState(() => _procesando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('ESCANEAR DOCUMENTO')),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect: _onDetect,
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+          ),
+          // Botón flotante para el OCR (DNI Electrónico)
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: ElevatedButton.icon(
+              onPressed: _procesando ? null : _escanearMRZ,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('DNI ELECTRÓNICO / MRZ (FOTO)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.black,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
