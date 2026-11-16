@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
+import '../services/auth_service.dart';
 
 class CierreCajaScreen extends StatefulWidget {
   @override
@@ -17,14 +18,11 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   double _totalVentas = 0.0;
   int _cantidadTransacciones = 0;
   bool _isLoading = true;
-
-  // ID del punto de venta actual
-  final int _puntoVentaId = 2;
+  int _puntoVentaId = 0;
 
   @override
   void initState() {
     super.initState();
-    // Usar addPostFrameCallback para asegurar que el Provider esté disponible
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cargarResumenCaja();
     });
@@ -32,12 +30,14 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
   Future<void> _cargarResumenCaja() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
+      final auth = Provider.of<AuthService>(context, listen: false);
+      
+      _puntoVentaId = auth.currentUser?['punto_venta_id_actual'] as int? ?? 2;
+      
       final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
       
       final ventas = await db.consultar(
@@ -71,7 +71,24 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   Future<void> _exportarMIG(BuildContext context) async {
     try {
       final dbHelper = Provider.of<DatabaseHelper>(context, listen: false);
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final usuarioId = auth.currentUser?['id'] as int? ?? 1;
+      final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
       
+      // 1. Registrar el cierre en la base de datos ANTES de exportar
+      await dbHelper.insertar('cierres_caja', {
+        'fecha': hoy,
+        'punto_venta_id': _puntoVentaId,
+        'personal_id': usuarioId,
+        'saldo_inicial': 0.0,
+        'total_ventas': _totalVentas,
+        'total_gastos_manuales': 0.0,
+        'saldo_teorico': _totalVentas,
+        'saldo_real_contado': _totalVentas,
+        'diferencia': 0.0,
+        'observaciones': 'Cierre generado por vendedor desde la app.',
+      });
+
       final db = await dbHelper.database;
       await db.close();
 
@@ -104,7 +121,7 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
       await Share.shareXFiles(
         [XFile(exportPath)],
-        text: 'Cierre de turno El Tonel - $fecha\nTotal: S/ ${_totalVentas.toStringAsFixed(2)}\nTransacciones: $_cantidadTransacciones',
+        text: 'Cierre de turno El Tonel - $fecha\nPV: $_puntoVentaId\nTotal: S/ ${_totalVentas.toStringAsFixed(2)}\nTransacciones: $_cantidadTransacciones',
       );
       
     } catch (e) {
