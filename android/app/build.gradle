@@ -1,3 +1,9 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -21,13 +27,9 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
 android {
     namespace "com.example.eltonel_full"
-    compileSdkVersion 34 // <-- FORZADO A 34
+    compileSdkVersion 34 // <-- MANTENIDO EN 34
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -46,7 +48,7 @@ android {
     defaultConfig {
         applicationId "com.example.eltonel_full"
         minSdkVersion 21
-        targetSdkVersion 34 // <-- FORZADO A 34
+        targetSdkVersion 34 // <-- MANTENIDO EN 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
@@ -64,5 +66,4 @@ flutter {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    // Aquí no hay dependencias extra
 }
