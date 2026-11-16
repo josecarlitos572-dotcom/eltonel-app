@@ -14,7 +14,7 @@ class AdminGenerarBatchScreen extends StatefulWidget {
 class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
   List<Map<String, dynamic>> _productos = [];
   List<Map<String, dynamic>> _puntos = [];
-  List<Map<String, dynamic>> _carrito = [];
+  Map<int, TextEditingController> _cantidades = {};
   bool _cargando = true;
   String _busqueda = '';
   String _tipo = 'ABASTO';
@@ -26,6 +26,14 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargarTodo());
+  }
+
+  @override
+  void dispose() {
+    for (var ctrl in _cantidades.values) {
+      ctrl.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _cargarTodo() async {
@@ -41,6 +49,12 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
         if (_puntos.isNotEmpty) {
           _pvDestinoId = _puntos.first['id'] as int;
         }
+        
+        // Inicializar controladores vacíos para cada producto
+        for (var p in _productos) {
+          _cantidades[p['id'] as int] = TextEditingController();
+        }
+        
         _cargando = false;
       });
     }
@@ -56,45 +70,36 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
     }).toList();
   }
 
-  void _agregar(Map<String, dynamic> producto) {
-    setState(() {
-      final existing = _carrito.firstWhere(
-        (p) => p['producto_id'] == producto['id'],
-        orElse: () => {},
-      );
-      if (existing.isNotEmpty) {
-        existing['cantidad'] += 1;
-      } else {
-        _carrito.add({
-          'producto_id': producto['id'],
-          'codigo': producto['codigo'],
-          'nombre': producto['nombre'],
-          'cantidad': 6,
-        });
-      }
-    });
-  }
-
-  void _quitar(int i) {
-    setState(() => _carrito.removeAt(i));
-  }
-
-  void _cambiarCantidad(int i, int delta) {
-    setState(() {
-      final nuevo = (_carrito[i]['cantidad'] as int) + delta;
-      if (nuevo < 1) return;
-      _carrito[i]['cantidad'] = nuevo;
-    });
-  }
-
   int get _totalUnidades {
-    return _carrito.fold(0, (s, e) => s + (e['cantidad'] as int));
+    int total = 0;
+    _cantidades.forEach((_, ctrl) {
+      final val = int.tryParse(ctrl.text) ?? 0;
+      total += val;
+    });
+    return total;
+  }
+
+  int get _totalProductos {
+    return _cantidades.values.where((ctrl) => (int.tryParse(ctrl.text) ?? 0) > 0).length;
   }
 
   Future<void> _generarBatch() async {
-    if (_carrito.isEmpty) {
+    // 1. Construir el carrito a partir de las cantidades > 0
+    List<Map<String, dynamic>> carrito = [];
+    for (var p in _productos) {
+      final id = p['id'] as int;
+      final cant = int.tryParse(_cantidades[id]?.text ?? '') ?? 0;
+      if (cant > 0) {
+        carrito.add({
+          'producto_id': id,
+          'cantidad': cant,
+        });
+      }
+    }
+
+    if (carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Agrega productos al carrito'), backgroundColor: Colors.orange),
+        SnackBar(content: Text('Asigna cantidad a por lo menos un producto'), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -125,12 +130,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
         : 'sha256:0000';
 
     final payload = {
-      'items': _carrito
-          .map((e) => {
-                'producto_id': e['producto_id'],
-                'cantidad': e['cantidad'],
-              })
-          .toList(),
+      'items': carrito,
     };
 
     final contenidoPayload = jsonEncode(payload);
@@ -174,7 +174,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
       'accion': 'BATCH_GENERADO',
       'registro_id': sec,
       'datos_anteriores': null,
-      'datos_nuevos': 'Tipo: $_tipo | Destino: $pvCodigo | Items: ${_carrito.length}',
+      'datos_nuevos': 'Tipo: $_tipo | Destino: $pvCodigo | Items: ${carrito.length}',
     });
 
     if (!mounted) return;
@@ -215,8 +215,11 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
+              // Limpiar formulario
               setState(() {
-                _carrito.clear();
+                for (var ctrl in _cantidades.values) {
+                  ctrl.clear();
+                }
               });
             },
             child: Text('CERRAR', style: TextStyle(color: Colors.white)),
@@ -240,7 +243,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('GENERAR BATCH'),
+        title: Text('CARGA MASIVA (STOCK)'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
@@ -313,85 +316,57 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
               style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
             ),
           ),
+          
+          // GRILLA DE CARGA MASIVA
           Expanded(
-            flex: 2,
             child: ListView.builder(
               itemCount: filtrados.length,
               itemBuilder: (ctx, i) {
                 final p = filtrados[i];
-                return ListTile(
-                  dense: true,
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.yellow,
-                    child: Text(p['codigo'] ?? '?',
-                        style: TextStyle(
-                            color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                final id = p['id'] as int;
+                return Container(
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Colors.white12))
                   ),
-                  title: Text(p['nombre'] ?? '',
-                      style: TextStyle(
-                          color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
-                  trailing: IconButton(
-                    icon: Icon(Icons.add_circle, color: Colors.yellow, size: 22),
-                    onPressed: () => _agregar(p),
+                  child: ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.yellow,
+                      child: Text(p['codigo'] ?? '?',
+                          style: TextStyle(
+                              color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                    title: Text(p['nombre'] ?? '',
+                        style: TextStyle(
+                            color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
+                    trailing: SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _cantidades[id],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        onChanged: (v) => setState(() {}), // Para actualizar contador inferior
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          hintStyle: TextStyle(color: Colors.white24),
+                          filled: true,
+                          fillColor: Colors.black,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.yellow),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.yellow, width: 2),
+                          ),
+                        ),
+                        style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                 );
               },
             ),
-          ),
-          Container(
-            constraints: BoxConstraints(maxHeight: 180),
-            color: Color(0xFF1A1A1A),
-            child: _carrito.isEmpty
-                ? Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text('Carrito vacío',
-                        style: TextStyle(
-                            color: Colors.white38, fontFamily: 'CourierNew', fontSize: 11)),
-                  )
-                : ListView.builder(
-                    itemCount: _carrito.length,
-                    itemBuilder: (ctx, i) {
-                      final item = _carrito[i];
-                      return ListTile(
-                        dense: true,
-                        title: Text('${item['codigo']} ${item['nombre']}',
-                            style: TextStyle(
-                                color: Colors.white, fontFamily: 'CourierNew', fontSize: 11)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.remove, color: Colors.orange, size: 18),
-                              onPressed: () => _cambiarCantidad(i, -1),
-                              padding: EdgeInsets.zero,
-                              constraints: BoxConstraints(),
-                            ),
-                            Container(
-                              width: 30,
-                              alignment: Alignment.center,
-                              child: Text('${item['cantidad']}',
-                                  style: TextStyle(
-                                      color: Colors.yellow,
-                                      fontFamily: 'CourierNew',
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.add, color: Colors.green, size: 18),
-                              onPressed: () => _cambiarCantidad(i, 1),
-                              padding: EdgeInsets.zero,
-                              constraints: BoxConstraints(),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.close, color: Colors.red, size: 18),
-                              onPressed: () => _quitar(i),
-                              padding: EdgeInsets.zero,
-                              constraints: BoxConstraints(),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
           ),
           Container(
             padding: EdgeInsets.all(10),
@@ -399,15 +374,15 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
             child: Column(
               children: [
                 Text(
-                  '${_carrito.length} productos · $_totalUnidades unidades',
+                  '$_totalProductos productos · $_totalUnidades unidades asignadas',
                   style: TextStyle(
-                      color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11),
+                      color: Colors.white70, fontFamily: 'CourierNew', fontSize: 12),
                 ),
                 SizedBox(height: 6),
                 ElevatedButton.icon(
                   onPressed: _generarBatch,
                   icon: Icon(Icons.send, color: Colors.black),
-                  label: Text('GENERAR Y ENVIAR BATCH'),
+                  label: Text('GENERAR BATCH PARA WSP'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: Size(double.infinity, 50),
                     backgroundColor: Colors.yellow,
