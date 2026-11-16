@@ -29,7 +29,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.eltonel_full"
-    compileSdkVersion 34 // <-- MANTENIDO EN 34
+    compileSdkVersion 35 // CORREGIDO A 35 SEGÚN EL REQUERIMIENTO DEL LOG
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -47,8 +47,8 @@ android {
 
     defaultConfig {
         applicationId "com.example.eltonel_full"
-        minSdkVersion 21
-        targetSdkVersion 34 // <-- MANTENIDO EN 34
+        minSdkVersion 26 // CORREGIDO A 26 PARA SOPORTAR ICONOS ADAPTATIVOS
+        targetSdkVersion 35 // SUBIDO A 35 PARA EVITAR ADVERTENCIAS DE AAPT
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
