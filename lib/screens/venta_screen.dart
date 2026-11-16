@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 import '../services/auth_service.dart';
+import 'scanner_screen.dart';
 
 class VentaScreen extends StatefulWidget {
   @override
@@ -101,26 +102,51 @@ class _VentaScreenState extends State<VentaScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: Text(tipoVenta == 'CREDITO' ? 'REGISTRAR FIADO' : 'DATOS COMANDA', 
               style: const TextStyle(color: Color(0xFFFFC107), fontFamily: 'CourierNew', fontSize: 16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nombreCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre del cliente'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: dniCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'DNI (Opcional)'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: fonoCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Celular (Opcional)'),
-              ),
-            ],
+          content: StatefulBuilder( // Usamos StatefulBuilder para actualizar los campos tras el escaneo
+            builder: (context, setStateDialog) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: nombreCtrl,
+                          decoration: const InputDecoration(labelText: 'Nombre del cliente'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.camera_alt, color: Color(0xFFFFC107)),
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ScannerScreen()),
+                          );
+                          if (result != null) {
+                            setStateDialog(() {
+                              dniCtrl.text = result['numero'] ?? '';
+                              nombreCtrl.text = result['nombre'] ?? '';
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: dniCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'DNI / Documento'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: fonoCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Celular (Opcional)'),
+                  ),
+                ],
+              );
+            }
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR', style: TextStyle(color: Colors.white))),
@@ -205,7 +231,6 @@ class _VentaScreenState extends State<VentaScreen> {
       ),
       body: Column(
         children: [
-          // GRILLA DE PRODUCTOS MEJORADA
           Expanded(
             flex: 3,
             child: GridView.builder(
@@ -249,7 +274,6 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ),
           
-          // CARRITO Y TOTAL
           Expanded(
             flex: 2,
             child: Container(
@@ -284,7 +308,6 @@ class _VentaScreenState extends State<VentaScreen> {
                           ),
                   ),
                   
-                  // BOTONES DE COBRO GIGANTES
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: const BoxDecoration(
