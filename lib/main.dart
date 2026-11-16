@@ -62,7 +62,6 @@ class ElTonelApp extends StatelessWidget {
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2)),
         ),
       ),
-      // CORRECCIÓN AQUÍ: Quitamos el const
       home: InactivityWrapper(child: LoginScreen()),
     );
   }
