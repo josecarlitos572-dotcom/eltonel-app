@@ -241,14 +241,10 @@ class DatabaseHelper extends ChangeNotifier {
     return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
 
-  // =========================================================
-  // NUEVO MÉTODO AGREGADO PARA SOLUCIONAR EL ERROR DE BUILD
-  // =========================================================
   Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? arguments]) async {
     final db = await database;
     return await db.rawQuery(sql, arguments);
   }
-  // =========================================================
 
   Future<List<Map<String, dynamic>>> getProductos() async {
     final db = await database;
@@ -383,6 +379,7 @@ class DatabaseHelper extends ChangeNotifier {
     final db = await database;
     await db.transaction((txn) async {
       int ventaId = await txn.insert('ventas', ventaData);
+      
       for (var item in items) {
         await txn.insert('detalle_venta', {
           'venta_id': ventaId,
@@ -391,10 +388,27 @@ class DatabaseHelper extends ChangeNotifier {
           'precio_unitario': item['price'],
           'subtotal': item['qty'] * item['price'],
         });
-        await txn.rawUpdate(
-          'UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-          [item['qty'], item['id'], ventaData['punto_venta_id'], DateTime.now().toIso8601String().split('T')[0]],
+        
+        final hoy = DateTime.now().toIso8601String().split('T')[0];
+        
+        final existeInv = await txn.query('inventario', 
+          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+          whereArgs: [item['id'], ventaData['punto_venta_id'], hoy]
         );
+
+        if (existeInv.isEmpty) {
+          await txn.insert('inventario', {
+            'producto_id': item['id'],
+            'punto_venta_id': ventaData['punto_venta_id'],
+            'stock': -(item['qty'] as int),
+            'fecha': hoy,
+          });
+        } else {
+          await txn.rawUpdate(
+            'UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+            [item['qty'], item['id'], ventaData['punto_venta_id'], hoy],
+          );
+        }
       }
     });
   }
