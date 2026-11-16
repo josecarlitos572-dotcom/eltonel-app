@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
+import 'admin_importar_db_screen.dart'; // <-- IMPORTACIÓN AGREGADA
 
 class AdminDashboardScreen extends StatefulWidget {
   @override
@@ -135,6 +136,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: _tarjetaInt('QUIEBRES', _totalQuiebres, Colors.orange)),
               ],
             ),
+            
+            // BOTÓN DE IMPORTACIÓN AGREGADO AQUÍ
+            SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => AdminImportarDbScreen()),
+                );
+                _cargar(); // Recargar al volver
+              },
+              icon: Icon(Icons.upload_file, color: Colors.black),
+              label: Text('IMPORTAR DATOS DE VENDEDOR'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 50),
+                backgroundColor: Colors.yellow,
+                foregroundColor: Colors.black,
+                textStyle: TextStyle(
+                    fontFamily: 'CourierNew',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              ),
+            ),
+
             SizedBox(height: 20),
             Text('DETALLE POR PUNTO DE VENTA',
                 style: TextStyle(
