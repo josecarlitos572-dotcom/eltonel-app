@@ -49,30 +49,26 @@ class _VentaScreenState extends State<VentaScreen> {
     }
 
     if (precio == 0.0) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Este producto no tiene precio para este punto de venta')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sin precio para este PV'), backgroundColor: Colors.red),
+      );
       return;
     }
 
-    if (mounted) {
-      setState(() {
-        final index = _carrito.indexWhere((item) => item['id'] == producto['id']);
-        if (index >= 0) {
-          _carrito[index]['cantidad']++;
-        } else {
-          _carrito.add({
-            'id': producto['id'],
-            'nombre': producto['nombre'],
-            'precio': precio,
-            'cantidad': 1,
-          });
-        }
-        _total += precio;
-      });
-    }
+    setState(() {
+      final index = _carrito.indexWhere((item) => item['id'] == producto['id']);
+      if (index >= 0) {
+        _carrito[index]['cantidad']++;
+      } else {
+        _carrito.add({
+          'id': producto['id'],
+          'nombre': producto['nombre'],
+          'precio': precio,
+          'cantidad': 1,
+        });
+      }
+      _total += precio;
+    });
   }
 
   void _quitarDelCarrito(int index) {
@@ -101,34 +97,34 @@ class _VentaScreenState extends State<VentaScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.black,
-          title: Text(tipoVenta == 'CREDITO' ? 'DATOS PARA FIADO' : 'DATOS PARA COMANDA', 
-              style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 14)),
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text(tipoVenta == 'CREDITO' ? 'REGISTRAR FIADO' : 'DATOS COMANDA', 
+              style: const TextStyle(color: Color(0xFFFFC107), fontFamily: 'CourierNew', fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                controller: nombreCtrl,
+                decoration: const InputDecoration(labelText: 'Nombre del cliente'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
                 controller: dniCtrl,
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'DNI (Opcional)', labelStyle: TextStyle(color: Colors.yellow)),
+                decoration: const InputDecoration(labelText: 'DNI (Opcional)'),
               ),
-              TextField(
-                controller: nombreCtrl,
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'Nombre del cliente', labelStyle: TextStyle(color: Colors.yellow)),
-              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: fonoCtrl,
                 keyboardType: TextInputType.phone,
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'Celular (Opcional)', labelStyle: TextStyle(color: Colors.yellow)),
+                decoration: const InputDecoration(labelText: 'Celular (Opcional)'),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('CANCELAR', style: TextStyle(color: Colors.white))),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('ACEPTAR', style: TextStyle(color: Colors.yellow))),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR', style: TextStyle(color: Colors.white))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ACEPTAR', style: TextStyle(color: Color(0xFFFFC107)))),
           ],
         ),
       );
@@ -141,7 +137,7 @@ class _VentaScreenState extends State<VentaScreen> {
       requiereComprobante = tipoVenta == 'ELECTRONICO';
 
       if (tipoVenta == 'CREDITO' && nombreCliente == 'Cliente Varios') {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Para fiar, el nombre es obligatorio'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Para fiar, el nombre es obligatorio'), backgroundColor: Colors.red));
         return;
       }
 
@@ -175,7 +171,7 @@ class _VentaScreenState extends State<VentaScreen> {
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Venta ($tipoVenta) registrada. Total: S/ ${_total.toStringAsFixed(2)}')),
+        SnackBar(content: Text('Venta ($tipoVenta) OK. Total: S/ ${_total.toStringAsFixed(2)}'), backgroundColor: Colors.green),
       );
       
       setState(() {
@@ -185,7 +181,7 @@ class _VentaScreenState extends State<VentaScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar venta: $e')),
+        SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -193,128 +189,162 @@ class _VentaScreenState extends State<VentaScreen> {
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFFC107))));
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vender - El Tonel'),
-        backgroundColor: Colors.orange,
+        title: const Text('NUEVA VENTA'),
         automaticallyImplyLeading: false,
+        actions: [
+          Center(child: Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: Text('S/ ${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, color: Color(0xFFFFC107), fontWeight: FontWeight.bold)),
+          ))
+        ],
       ),
       body: Column(
         children: [
+          // GRILLA DE PRODUCTOS MEJORADA
           Expanded(
             flex: 3,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return GridView.builder(
-                  padding: const EdgeInsets.all(8.0),
-                  physics: const PageScrollPhysics(), 
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _productos.length,
-                  itemBuilder: (context, index) {
-                    final prod = _productos[index];
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueGrey[50],
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => _agregarAlCarrito(prod),
+            child: GridView.builder(
+              padding: const EdgeInsets.all(10),
+              physics: const PageScrollPhysics(), 
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 1.2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: _productos.length,
+              itemBuilder: (context, index) {
+                final prod = _productos[index];
+                return Material(
+                  color: const Color(0xFF2C2C2C),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _agregarAlCarrito(prod),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(prod['nombre'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFFFFC107), borderRadius: BorderRadius.circular(4)),
+                            child: Text(prod['codigo'], style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+                          ),
+                          Text(prod['nombre'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text(prod['codigo'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          const Text('Toca para agregar', style: TextStyle(color: Colors.white38, fontSize: 9)),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 );
               },
             ),
           ),
+          
+          // CARRITO Y TOTAL
           Expanded(
             flex: 2,
             child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                border: const Border(top: BorderSide(color: Colors.grey, width: 2)),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
               ),
               child: Column(
                 children: [
                   Expanded(
                     child: _carrito.isEmpty
-                        ? const Center(child: Text('No hay productos', style: TextStyle(fontSize: 18, color: Colors.grey)))
+                        ? const Center(child: Text('Carrito Vacío', style: TextStyle(color: Colors.white38, fontSize: 16)))
                         : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                             itemCount: _carrito.length,
                             itemBuilder: (context, index) {
                               final item = _carrito[index];
-                              return ListTile(
-                                title: Text('${item['cantidad']}x ${item['nombre']}'),
-                                subtitle: Text('S/ ${(item['precio'] * item['cantidad']).toStringAsFixed(2)}'),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _quitarDelCarrito(index),
+                              return Card(
+                                color: const Color(0xFF2C2C2C),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                child: ListTile(
+                                  dense: true,
+                                  title: Text('${item['cantidad']} x ${item['nombre']}', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                  subtitle: Text('Subtotal: S/ ${(item['precio'] * item['cantidad']).toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFFFC107), fontSize: 11)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                    onPressed: () => _quitarDelCarrito(index),
+                                  ),
                                 ),
                               );
                             },
                           ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
+                  
+                  // BOTONES DE COBRO GIGANTES
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF121212),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          'TOTAL: S/ ${_total.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 60),
+                            ),
+                            onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('EFECTIVO'),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.money, size: 24),
+                                Text('EFECTIVO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size(0, 50),
-                                ),
-                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('EFECTIVO'),
-                                child: const Text('EFECTIVO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 60),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size(0, 50),
-                                ),
-                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('ELECTRONICO'),
-                                child: const Text('YAPE/PLIN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
+                            onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('ELECTRONICO'),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.account_balance_wallet, size: 24),
+                                Text('YAPE/PLIN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size(0, 50),
-                                ),
-                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('CREDITO'),
-                                child: const Text('FIADO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 60),
                             ),
-                          ],
+                            onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('CREDITO'),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.handshake, size: 24),
+                                Text('FIADO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
