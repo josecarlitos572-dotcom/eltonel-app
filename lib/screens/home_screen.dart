@@ -13,7 +13,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Si es vendedor, pon false
     final bool isAdmin = true; 
 
     final List<Widget> _screens = isAdmin 
