@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 
@@ -14,7 +12,7 @@ class AdminImportarDbScreen extends StatefulWidget {
 
 class _AdminImportarDbScreenState extends State<AdminImportarDbScreen> {
   bool _procesando = false;
-  String _status = 'Selecciona el archivo .db que te envió el vendedor.';
+  String _status = 'Selecciona el archivo JSON que te envió el vendedor.';
   int _ventasImportadas = 0;
 
   Future<void> _seleccionarEImportar() async {
@@ -30,88 +28,75 @@ class _AdminImportarDbScreenState extends State<AdminImportarDbScreen> {
       _ventasImportadas = 0;
     });
 
-    File? tempFile;
-    Database? dbExterna;
-
     try {
-      final originalFile = File(result.files.single.path!);
-      
-      // Copiamos a un directorio temporal para no bloquear el archivo original
-      final tempDir = await getTemporaryDirectory();
-      tempFile = File(p.join(tempDir.path, 'import_temp.db'));
-      if (await tempFile.exists()) await tempFile.delete();
-      await originalFile.copy(tempFile.path);
+      final file = File(result.files.single.path!);
+      final jsonStr = await file.readAsString();
+      final Map<String, dynamic> json = jsonDecode(jsonStr);
 
-      // Abrimos la base de datos externa en modo lectura
-      dbExterna = await openDatabase(tempFile.path, readOnly: true);
-
-      // Verificamos que sea una BD de El Tonel
-      final tablas = await dbExterna.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='ventas'");
-      if (tablas.isEmpty) {
-        throw Exception('El archivo no es una base de datos válida de El Tonel.');
+      // Validar que sea un archivo de cierre
+      if (json['tipo'] != 'CIERRE_DIA') {
+        throw Exception('El archivo no es un Cierre de Día válido.');
       }
 
-      setState(() => _status = 'Leyendo ventas...');
+      final data = json['data'] as Map<String, dynamic>?;
+      if (data == null) throw Exception('JSON sin datos (data).');
 
-      // 1. Leer Ventas
-      final ventas = await dbExterna.query('ventas');
+      final ventas = (data['ventas'] as List?) ?? [];
+      final detalles = (data['detalles'] as List?) ?? [];
+      final cierres = (data['cierres'] as List?) ?? [];
+      final mermas = (data['mermas'] as List?) ?? [];
+
       final dbLocal = Provider.of<DatabaseHelper>(context, listen: false);
       final db = await dbLocal.database;
 
+      setState(() => _status = 'Importando datos...');
+
       await db.transaction((txn) async {
+        // 1. Insertar Ventas (evitando duplicados por ID y fecha)
         for (var v in ventas) {
-          // Verificar si la venta ya existe (por fecha y monto exacto para evitar duplicados)
           final existe = await txn.query('ventas',
-              where: 'fecha = ? AND monto_total = ? AND punto_venta_id = ?',
-              whereArgs: [v['fecha'], v['monto_total'], v['punto_venta_id']]);
+              where: 'id = ? AND fecha = ?',
+              whereArgs: [v['id'], v['fecha']]);
           
           if (existe.isEmpty) {
-            // Insertamos la venta
-            final nuevoId = await txn.insert('ventas', v);
+            await txn.insert('ventas', Map<String, dynamic>.from(v));
             _ventasImportadas++;
-
-            // 2. Leer y migrar el detalle de esa venta
-            final detalles = await dbExterna!.query('detalle_venta',
-                where: 'venta_id = ?', whereArgs: [v['id']]);
-            
-            for (var d in detalles) {
-              final nuevoDetalle = Map<String, dynamic>.from(d);
-              nuevoDetalle['venta_id'] = nuevoId; // Reasignar al nuevo ID
-              nuevoDetalle.remove('id'); // Quitar ID viejo para que se autoincremente
-              await txn.insert('detalle_venta', nuevoDetalle);
-            }
           }
         }
 
-        // 3. Leer Cierres de Caja
-        setState(() => _status = 'Leyendo cierres de caja...');
-        final cierres = await dbExterna!.query('cierres_caja');
+        // 2. Insertar Detalles
+        for (var d in detalles) {
+          final existe = await txn.query('detalle_venta',
+              where: 'id = ?', whereArgs: [d['id']]);
+          if (existe.isEmpty) {
+            await txn.insert('detalle_venta', Map<String, dynamic>.from(d));
+          }
+        }
+
+        // 3. Insertar Cierres de Caja
         for (var c in cierres) {
-          final existeCierre = await txn.query('cierres_caja',
+          final existe = await txn.query('cierres_caja',
               where: 'fecha = ? AND punto_venta_id = ?',
               whereArgs: [c['fecha'], c['punto_venta_id']]);
-          
-          if (existeCierre.isEmpty) {
-            final nuevoCierre = Map<String, dynamic>.from(c);
-            nuevoCierre.remove('id');
-            await txn.insert('cierres_caja', nuevoCierre);
+          if (existe.isEmpty) {
+            await txn.insert('cierres_caja', Map<String, dynamic>.from(c));
           }
         }
 
-        // 4. Leer Gastos Internos
-        setState(() => _status = 'Leyendo gastos...');
-        final gastos = await dbExterna!.query('gastos_internos');
-        for (var g in gastos) {
-          final nuevoGasto = Map<String, dynamic>.from(g);
-          nuevoGasto.remove('id');
-          await txn.insert('gastos_internos', nuevoGasto);
+        // 4. Insertar Mermas (Quiebres)
+        for (var m in mermas) {
+          final existe = await txn.query('quiebres',
+              where: 'fecha = ? AND punto_venta_id = ? AND producto_id = ?',
+              whereArgs: [m['fecha'], m['punto_venta_id'], m['producto_id']]);
+          if (existe.isEmpty) {
+            await txn.insert('quiebres', Map<String, dynamic>.from(m));
+          }
         }
       });
 
       setState(() {
         _procesando = false;
-        _status = '¡Importación exitosa! Se agregaron $_ventasImportadas ventas nuevas a la base de datos maestra.';
+        _status = '¡Importación exitosa! Se agregaron $_ventasImportadas ventas nuevas a tu base de datos.';
       });
 
     } catch (e) {
@@ -119,12 +104,6 @@ class _AdminImportarDbScreenState extends State<AdminImportarDbScreen> {
         _procesando = false;
         _status = 'Error al importar: $e';
       });
-    } finally {
-      // Limpieza
-      if (dbExterna != null) await dbExterna.close();
-      if (tempFile != null && await tempFile.exists()) {
-        await tempFile.delete();
-      }
     }
   }
 
@@ -132,7 +111,7 @@ class _AdminImportarDbScreenState extends State<AdminImportarDbScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('IMPORTAR BASE DE DATOS'),
+        title: Text('IMPORTAR CIERRE (JSON)'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
@@ -160,7 +139,7 @@ class _AdminImportarDbScreenState extends State<AdminImportarDbScreen> {
                 ElevatedButton.icon(
                   onPressed: _seleccionarEImportar,
                   icon: Icon(Icons.folder_open, color: Colors.black),
-                  label: Text('SELECCIONAR ARCHIVO .DB'),
+                  label: Text('SELECCIONAR ARCHIVO .JSON'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: Size(double.infinity, 60),
                     backgroundColor: Colors.yellow,
