@@ -79,47 +79,29 @@ class _ParametrosScreenState extends State<ParametrosScreen> {
 
   String _etiquetaClave(String clave) {
     switch (clave) {
-      case 'empresa_nombre':
-        return 'NOMBRE DE LA EMPRESA';
-      case 'empresa_ruc':
-        return 'RUC';
-      case 'igv':
-        return 'IGV (%)';
-      case 'moneda':
-        return 'MONEDA';
-      case 'admin_whatsapp':
-        return 'WHATSAPP ADMIN';
-      case 'hora_cierre':
-        return 'HORA DE CIERRE';
-      case 'inactividad_minutos':
-        return 'INACTIVIDAD (min)';
-      case 'version_bd':
-        return 'VERSIÓN BD';
-      default:
-        return clave.toUpperCase();
+      case 'empresa_nombre': return 'NOMBRE DE LA EMPRESA';
+      case 'empresa_ruc': return 'RUC';
+      case 'igv': return 'IGV (%)';
+      case 'moneda': return 'MONEDA';
+      case 'admin_whatsapp': return 'WHATSAPP ADMIN';
+      case 'hora_cierre': return 'HORA DE CIERRE';
+      case 'inactividad_minutos': return 'INACTIVIDAD (min)';
+      case 'version_bd': return 'VERSIÓN BD';
+      default: return clave.toUpperCase();
     }
   }
 
   IconData _iconoClave(String clave) {
     switch (clave) {
-      case 'empresa_nombre':
-        return Icons.business;
-      case 'empresa_ruc':
-        return Icons.badge;
-      case 'igv':
-        return Icons.percent;
-      case 'moneda':
-        return Icons.attach_money;
-      case 'admin_whatsapp':
-        return Icons.phone;
-      case 'hora_cierre':
-        return Icons.schedule;
-      case 'inactividad_minutos':
-        return Icons.timer;
-      case 'version_bd':
-        return Icons.storage;
-      default:
-        return Icons.settings;
+      case 'empresa_nombre': return Icons.business;
+      case 'empresa_ruc': return Icons.badge;
+      case 'igv': return Icons.percent;
+      case 'moneda': return Icons.attach_money;
+      case 'admin_whatsapp': return Icons.phone;
+      case 'hora_cierre': return Icons.schedule;
+      case 'inactividad_minutos': return Icons.timer;
+      case 'version_bd': return Icons.storage;
+      default: return Icons.settings;
     }
   }
 
