@@ -21,7 +21,6 @@ class _CxcScreenState extends State<CxcScreen> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     final db = Provider.of<DatabaseHelper>(context, listen: false);
-
     final cuentas = await db.consultarCuentasPendientes();
 
     if (mounted) {
@@ -68,6 +67,9 @@ class _CxcScreenState extends State<CxcScreen> {
             children: [
               Text('Cliente: ${cuenta['cliente_nombre'] ?? ''}',
                   style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
+              SizedBox(height: 6),
+              Text('Celular: ${cuenta['cliente_telefono'] ?? 'No registrado'}',
+                  style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 11)),
               SizedBox(height: 6),
               Text('Saldo pendiente: S/ ${saldoActual.toStringAsFixed(2)}',
                   style: TextStyle(
@@ -124,9 +126,7 @@ class _CxcScreenState extends State<CxcScreen> {
 
     if (monto > saldoActual) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('El abono excede el saldo pendiente'),
-            backgroundColor: Colors.red),
+        SnackBar(content: Text('El abono excede el saldo pendiente'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -140,8 +140,7 @@ class _CxcScreenState extends State<CxcScreen> {
 
       await db.actualizar('cuentas_por_cobrar', {
         'id': cuenta['id'],
-        'monto_pagado':
-            ((cuenta['monto_pagado'] as num?)?.toDouble() ?? 0.0) + monto,
+        'monto_pagado': ((cuenta['monto_pagado'] as num?)?.toDouble() ?? 0.0) + monto,
         'saldo_pendiente': nuevoSaldo,
         'estado': nuevoEstado,
       });
@@ -167,10 +166,7 @@ class _CxcScreenState extends State<CxcScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Abono registrado: S/ ${monto.toStringAsFixed(2)}'),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text('Abono registrado: S/ ${monto.toStringAsFixed(2)}'), backgroundColor: Colors.green),
       );
 
       _cargar();
@@ -186,8 +182,7 @@ class _CxcScreenState extends State<CxcScreen> {
     if (_cargando) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-            title: Text('CUENTAS POR COBRAR'), backgroundColor: Colors.black),
+        appBar: AppBar(title: Text('CUENTAS POR COBRAR'), backgroundColor: Colors.black),
         body: Center(child: CircularProgressIndicator(color: Colors.yellow)),
       );
     }
@@ -221,32 +216,14 @@ class _CxcScreenState extends State<CxcScreen> {
               children: [
                 Column(
                   children: [
-                    Text('POR COBRAR',
-                        style: TextStyle(
-                            color: Colors.white70,
-                            fontFamily: 'CourierNew',
-                            fontSize: 10)),
-                    Text('S/ ${totalPorCobrar.toStringAsFixed(2)}',
-                        style: TextStyle(
-                            color: Colors.yellow,
-                            fontFamily: 'CourierNew',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
+                    Text('POR COBRAR', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 10)),
+                    Text('S/ ${totalPorCobrar.toStringAsFixed(2)}', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 16, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Column(
                   children: [
-                    Text('VENCIDO',
-                        style: TextStyle(
-                            color: Colors.white70,
-                            fontFamily: 'CourierNew',
-                            fontSize: 10)),
-                    Text('S/ ${totalVencido.toStringAsFixed(2)}',
-                        style: TextStyle(
-                            color: Colors.red,
-                            fontFamily: 'CourierNew',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
+                    Text('VENCIDO', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 10)),
+                    Text('S/ ${totalVencido.toStringAsFixed(2)}', style: TextStyle(color: Colors.red, fontFamily: 'CourierNew', fontSize: 16, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
@@ -254,17 +231,12 @@ class _CxcScreenState extends State<CxcScreen> {
           ),
           Expanded(
             child: _cuentas.isEmpty
-                ? Center(
-                    child: Text('Sin cuentas pendientes',
-                        style: TextStyle(
-                            color: Colors.white54, fontFamily: 'CourierNew')),
-                  )
+                ? Center(child: Text('Sin cuentas pendientes', style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew')))
                 : ListView.builder(
                     itemCount: _cuentas.length,
                     itemBuilder: (ctx, i) {
                       final c = _cuentas[i];
-                      final saldo =
-                          (c['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+                      final saldo = (c['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
                       final dias = _diasAtraso(c['fecha_vencimiento'] as String?);
                       final color = _colorAlerta(saldo, dias);
 
@@ -274,37 +246,15 @@ class _CxcScreenState extends State<CxcScreen> {
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: color,
-                            child: Icon(
-                              dias > 0 ? Icons.warning : Icons.schedule,
-                              color: Colors.black,
-                              size: 20,
-                            ),
+                            child: Icon(dias > 0 ? Icons.warning : Icons.schedule, color: Colors.black, size: 20),
                           ),
-                          title: Text(
-                            c['cliente_nombre'] ?? 'Sin nombre',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'CourierNew',
-                                fontSize: 13),
-                          ),
+                          title: Text(c['cliente_nombre'] ?? 'Sin nombre', style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Saldo: S/ ${saldo.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                      color: color,
-                                      fontFamily: 'CourierNew',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold)),
-                              Text(
-                                dias > 0
-                                    ? 'VENCIDO hace $dias días'
-                                    : 'Vence: ${c['fecha_vencimiento'] ?? '-'}',
-                                style: TextStyle(
-                                    color: Colors.white54,
-                                    fontFamily: 'CourierNew',
-                                    fontSize: 10),
-                              ),
+                              Text('Celular: ${c['cliente_telefono'] ?? '-'}', style: TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 10)),
+                              Text('Saldo: S/ ${saldo.toStringAsFixed(2)}', style: TextStyle(color: color, fontFamily: 'CourierNew', fontSize: 12, fontWeight: FontWeight.bold)),
+                              Text(dias > 0 ? 'VENCIDO hace $dias días' : 'Vence: ${c['fecha_vencimiento'] ?? '-'}', style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 10)),
                             ],
                           ),
                           trailing: IconButton(
