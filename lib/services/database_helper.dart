@@ -6,6 +6,9 @@ class DatabaseHelper extends ChangeNotifier {
   static Database? _database;
   List<Map<String, dynamic>> _cachedProducts = [];
 
+  // ESTANDARIZACIÓN DEL NOMBRE DE LA BASE DE DATOS
+  static const String dbName = 'eltonel_v12.db';
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -14,7 +17,7 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'eltonel.db');
+    String path = join(await getDatabasesPath(), dbName);
     return await openDatabase(
       path,
       version: 12,
@@ -98,9 +101,10 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('categorias_gasto', {'nombre': 'Rellenos Panes', 'limite_max': 12});
     await db.insert('categorias_gasto', {'nombre': 'Desayuno', 'limite_max': 6});
 
+    // DATOS DE ACCESO MAESTROS GRABADOS A FUEGO
     await db.insert('personal', {
-      'apellidos': 'Dueño', 'nombres': 'Admin', 'dni': '00000000',
-      'rol': 'ADMIN', 'password': 'tonel123', 'punto_venta_id': 0
+      'apellidos': 'ADMIN', 'nombres': 'PRINCIPAL', 'dni': '09878372',
+      'rol': 'ADMIN', 'password': 'JOse\$\$11', 'punto_venta_id': 0
     });
 
     await _seedProductosYCategorias(db);
