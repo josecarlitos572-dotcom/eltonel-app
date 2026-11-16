@@ -22,23 +22,8 @@ subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
-// Eliminamos la línea problemática que forzaba la evaluación temprana
-// project.evaluationDependsOn(':app') 
-
-subprojects {
-    plugins.withId('com.android.application') {
-        android {
-            compileSdkVersion 34
-            buildToolsVersion "34.0.0"
-        }
-    }
-    plugins.withId('com.android.library') {
-        android {
-            compileSdkVersion 34
-            buildToolsVersion "34.0.0"
-        }
-    }
-}
+// ELIMINADO: project.evaluationDependsOn(':app') 
+// Esta línea era la que causaba el error de "already evaluated".
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
