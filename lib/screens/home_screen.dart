@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import 'venta_screen.dart';
 import 'cierre_caja_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -13,7 +15,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdmin = true; 
+    final auth = Provider.of<AuthService>(context);
+    final bool isAdmin = auth.currentUser?['rol'] == 'ADMIN';
 
     final List<Widget> _screens = isAdmin 
       ? [
@@ -26,32 +29,45 @@ class _HomeScreenState extends State<HomeScreen> {
           CierreCajaScreen(),        
         ];
 
+    // Asegurar que el índice no se salga de rango si cambia el rol
+    if (_selectedIndex >= _screens.length) _selectedIndex = 0;
+
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.point_of_sale, size: 30),
-            label: 'Vender',
-          ),
-          if (isAdmin) const BottomNavigationBarItem(
-            icon: Icon(Icons.admin_panel_settings, size: 30),
-            label: 'Admin',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.money, size: 30),
-            label: 'Cierre',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          border: Border(top: BorderSide(color: Colors.white12)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: const Color(0xFFFFC107),
+          unselectedItemColor: Colors.white38,
+          selectedLabelStyle: const TextStyle(fontFamily: 'CourierNew', fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontFamily: 'CourierNew', fontSize: 12),
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.point_of_sale, size: 28),
+              label: 'VENDER',
+            ),
+            if (isAdmin) const BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard, size: 28),
+              label: 'DASHBOARD',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.output, size: 28),
+              label: 'CIERRE',
+            ),
+          ],
+        ),
       ),
     );
   }
