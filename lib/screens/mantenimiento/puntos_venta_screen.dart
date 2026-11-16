@@ -150,14 +150,18 @@ class _PuntosVentaScreenState extends State<PuntosVentaScreen> {
     }
   }
 
-  Future<void> _desactivar(int id, String nombre) async {
+  Future<void> _desactivar(Map<String, dynamic> punto) async {
+    final pvId = punto['id'] as int;
+    final nombre = punto['nombre'] ?? '';
+
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
-        title: Text('¿Desactivar?',
+        title: Text('¿Desactivar Punto?',
             style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
-        content: Text('Se desactivará "$nombre"',
+        content: Text(
+            'Se desactivará "$nombre".\n\nATENCIÓN: Los vendedores asignados a este punto no podrán operar hasta que se les reasigne a otro punto.',
             style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
         actions: [
           TextButton(
@@ -165,13 +169,14 @@ class _PuntosVentaScreenState extends State<PuntosVentaScreen> {
               child: Text('NO', style: TextStyle(color: Colors.white))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text('SÍ', style: TextStyle(color: Colors.red))),
+              child: Text('SÍ, DESACTIVAR', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
+    
     if (confirmar == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.actualizar('puntos_venta', {'id': id, 'activo': 0});
+      await db.actualizar('puntos_venta', {'id': pvId, 'activo': 0});
       _cargar();
     }
   }
@@ -213,7 +218,7 @@ class _PuntosVentaScreenState extends State<PuntosVentaScreen> {
                         fontSize: 13,
                       )),
                   subtitle: Text(
-                    '${p['ini_vta'] ?? '--'} a ${p['fin_vta'] ?? '--'} · Descansa: ${(p['dia_descanso'] ?? '--').toString().toUpperCase()}',
+                    '${p['ini_vta'] ?? '--'} a ${p['fin_vta'] ?? '--'} · Descansa: ${(p['dia_descanso'] ?? '--').toString().toUpperCase()} ${activo ? "" : "(INACTIVO)"}',
                     style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 11),
                   ),
                   trailing: Row(
@@ -223,8 +228,13 @@ class _PuntosVentaScreenState extends State<PuntosVentaScreen> {
                           icon: Icon(Icons.edit, color: Colors.yellow),
                           onPressed: () => _editar(punto: p)),
                       IconButton(
-                          icon: Icon(Icons.power_settings_new, color: Colors.red),
-                          onPressed: () => _desactivar(p['id'] as int, p['nombre'] ?? '')),
+                          icon: Icon(Icons.power_settings_new, 
+                              color: activo ? Colors.red : Colors.green),
+                          onPressed: activo ? () => _desactivar(p) : () async {
+                            final db = Provider.of<DatabaseHelper>(context, listen: false);
+                            await db.actualizar('puntos_venta', {'id': p['id'], 'activo': 1});
+                            _cargar();
+                          }),
                     ],
                   ),
                 );
