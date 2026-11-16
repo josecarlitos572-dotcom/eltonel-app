@@ -34,15 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: Text(titulo,
-            style: TextStyle(color: colorTitulo, fontFamily: 'CourierNew', fontSize: 16)),
-        content: Text(mensaje,
-            style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13)),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text(titulo, style: TextStyle(color: colorTitulo, fontFamily: 'CourierNew', fontSize: 16)),
+        content: Text(mensaje, style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('ENTENDIDO', style: TextStyle(color: Colors.yellow)),
+            child: const Text('ENTENDIDO', style: TextStyle(color: Color(0xFFFFC107))),
           ),
         ],
       ),
@@ -75,22 +74,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_diaSemana == 'dom') {
         auth.logout();
         setState(() => _cargando = false);
-        _mostrarDialogo(
-          'HOY NO HAY LABOR',
-          'Los domingos el negocio no opera.\n\nVuelve el lunes.',
-          Colors.orange,
-        );
+        _mostrarDialogo('HOY NO HAY LABOR', 'Los domingos el negocio no opera.\n\nVuelve el lunes.', Colors.orange);
         return;
       }
 
       if (!_estaEnHorario('03:00', '11:00')) {
         auth.logout();
         setState(() => _cargando = false);
-        _mostrarDialogo(
-          'FUERA DE HORARIO',
-          'El horario de operación es de 03:00 a 11:00.\n\nHora actual: $_horaActual',
-          Colors.red,
-        );
+        _mostrarDialogo('FUERA DE HORARIO', 'El horario de operación es de 03:00 a 11:00.\n\nHora actual: $_horaActual', Colors.red);
         return;
       }
 
@@ -103,90 +94,67 @@ class _LoginScreenState extends State<LoginScreen> {
       if (asignaciones.isEmpty) {
         auth.logout();
         setState(() => _cargando = false);
-        _mostrarDialogo(
-          'SIN ASIGNACIÓN',
-          'No estás asignado para trabajar hoy.\n\nContacta al administrador.',
-          Colors.red,
-        );
+        _mostrarDialogo('SIN ASIGNACIÓN', 'No estás asignado para trabajar hoy.\n\nContacta al administrador.', Colors.red);
         return;
       }
     }
 
     setState(() => _cargando = false);
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
       body: Center(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'DESAYUNOS EL TONEL',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'CourierNew',
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // LOGO SIMULADO
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFFC107), width: 3),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Sistema de Gestión',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontFamily: 'CourierNew',
-                    fontSize: 12,
-                  ),
-                ),
-                SizedBox(height: 40),
-                TextField(
-                  controller: _dniCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'DNI',
-                    labelStyle: TextStyle(color: Colors.yellow),
-                    border: OutlineInputBorder(),
-                  ),
-                  style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                ),
-                SizedBox(height: 20),
-                TextField(
-                  controller: _passCtrl,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'CONTRASEÑA',
-                    labelStyle: TextStyle(color: Colors.yellow),
-                    border: OutlineInputBorder(),
-                  ),
-                  style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                ),
-                SizedBox(height: 30),
-                _cargando
-                    ? CircularProgressIndicator(color: Colors.yellow)
-                    : ElevatedButton(
-                        onPressed: _login,
-                        child: Text('INGRESAR'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: Size(double.infinity, 50),
-                          backgroundColor: Colors.yellow,
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-              ],
-            ),
+                child: const Icon(Icons.breakfast_dining, size: 60, color: Color(0xFFFFC107)),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'DESAYUNOS EL TONEL',
+                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sistema de Gestión',
+                style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 12),
+              ),
+              const SizedBox(height: 50),
+              TextField(
+                controller: _dniCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'DNI'),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'CONTRASEÑA'),
+              ),
+              const SizedBox(height: 40),
+              _cargando
+                  ? const CircularProgressIndicator(color: Color(0xFFFFC107))
+                  : ElevatedButton(
+                      onPressed: _login,
+                      child: const Text('INGRESAR'),
+                    ),
+            ],
           ),
         ),
       ),
