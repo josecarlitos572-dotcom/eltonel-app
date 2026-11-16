@@ -504,4 +504,122 @@ class DatabaseHelper extends ChangeNotifier {
       ['$tipo-$fechaCompacta-%'],
     );
     final sec = ((movs.first['total'] as int?) ?? 0) + 1;
-    return '$tipo-$fechaCompacta-${sec.toString
+    return '$tipo-$fechaCompacta-${sec.toString().padLeft(3, '0')}';
+  }
+
+  Future<List<Map<String, dynamic>>> getStockPuntoVenta(int pvId) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+    return await db.rawQuery('''
+      SELECT i.*, p.codigo as prod_codigo, p.nombre as prod_nombre
+      FROM inventario i
+      LEFT JOIN productos p ON i.producto_id = p.id
+      WHERE i.punto_venta_id = ? AND i.fecha = ? AND i.stock > 0
+      ORDER BY p.codigo ASC
+    ''', [pvId, hoy]);
+  }
+
+  Future<void> registrarTrasladoCompleto({
+    required int origenId,
+    required int destinoId,
+    required int usuarioId,
+    required List<Map<String, dynamic>> items,
+    required String tipo,
+  }) async {
+    final db = await database;
+    final codigo = await generarCodigoTransferencia(tipo);
+    final ahora = DateTime.now().toIso8601String();
+
+    for (var item in items) {
+      await db.insert('transferencias', {
+        'fecha': ahora,
+        'producto_id': item['producto_id'],
+        'cantidad': item['cantidad'],
+        'cantidad_recibida': 0,
+        'origen_id': origenId,
+        'destino_id': destinoId,
+        'usuario_id': usuarioId,
+        'tipo': tipo,
+        'codigo': codigo,
+        'estado': 'PENDIENTE',
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTrasladosPendientes(int pvId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT t.*, p.codigo as prod_codigo, p.nombre as prod_nombre,
+             o.nombre as origen_nombre, o.codigo as origen_codigo
+      FROM transferencias t
+      LEFT JOIN productos p ON t.producto_id = p.id
+      LEFT JOIN puntos_venta o ON t.origen_id = o.id
+      WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
+      ORDER BY t.codigo ASC, p.codigo ASC
+    ''', [pvId]);
+  }
+
+  Future<void> recibirTraslado({
+    required String codigo,
+    required int destinoId,
+    required List<Map<String, dynamic>> itemsConCantidad,
+  }) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    for (var item in itemsConCantidad) {
+      final id = item['id'] as int;
+      final cantRecibida = item['cantidad_recibida'] as int;
+      final prodId = item['producto_id'] as int;
+
+      await db.update('transferencias', {
+        'cantidad_recibida': cantRecibida,
+        'estado': 'RECIBIDO',
+      }, where: 'id = ?', whereArgs: [id]);
+
+      final existente = await db.query('inventario',
+          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+          whereArgs: [prodId, destinoId, hoy]);
+
+      if (existente.isEmpty) {
+        await db.insert('inventario', {
+          'producto_id': prodId,
+          'punto_venta_id': destinoId,
+          'stock': cantRecibida,
+          'fecha': hoy,
+        });
+      } else {
+        final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
+        await db.update('inventario', {'stock': actual + cantRecibida},
+            where: 'id = ?', whereArgs: [existente.first['id']]);
+      }
+    }
+  }
+
+  Future<void> ejecutarDesmedroGlobal(int pvId, int usuarioId) async {
+    final db = await database;
+    final hoy = DateTime.now().toIso8601String().split('T')[0];
+
+    final stock = await db.query('inventario',
+        where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
+
+    int totalDesmedrado = 0;
+    for (var s in stock) {
+      final cant = (s['stock'] as num?)?.toInt() ?? 0;
+      totalDesmedrado += cant;
+      await db.update('inventario', {'stock': 0},
+          where: 'id = ?', whereArgs: [s['id']]);
+    }
+
+    await db.insert('auditoria_cambios', {
+      'fecha': DateTime.now().toIso8601String(),
+      'usuario_id': usuarioId,
+      'usuario_nombre': 'Sistema',
+      'tabla_afectada': 'inventario',
+      'accion': 'DESMEDRO_GLOBAL',
+      'registro_id': pvId,
+      'datos_anteriores': 'Stock: $totalDesmedrado uds',
+      'datos_nuevos': 'Stock: 0 uds',
+    });
+  }
+}
