@@ -87,11 +87,14 @@ class _VentaScreenState extends State<VentaScreen> {
     final auth = Provider.of<AuthService>(context, listen: false);
     final usuarioId = auth.currentUser?['id'] as int? ?? 1;
     
-    String nombreCliente = 'Cliente Varios';
+    String nombreCliente = 'Consumidor Final';
     String telefonoCliente = '';
+    String dniCliente = '';
     int? clienteId;
+    bool requiereComprobante = false;
 
-    if (tipoVenta == 'CREDITO') {
+    if (tipoVenta == 'CREDITO' || tipoVenta == 'ELECTRONICO') {
+      final dniCtrl = TextEditingController();
       final nombreCtrl = TextEditingController();
       final fonoCtrl = TextEditingController();
       
@@ -99,10 +102,17 @@ class _VentaScreenState extends State<VentaScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: Colors.black,
-          title: Text('DATOS DEL CLIENTE (FIADO)', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 14)),
+          title: Text(tipoVenta == 'CREDITO' ? 'DATOS PARA FIADO' : 'DATOS PARA COMANDA', 
+              style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 14)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              TextField(
+                controller: dniCtrl,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                decoration: InputDecoration(labelText: 'DNI (Opcional)', labelStyle: TextStyle(color: Colors.yellow)),
+              ),
               TextField(
                 controller: nombreCtrl,
                 style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
@@ -112,7 +122,7 @@ class _VentaScreenState extends State<VentaScreen> {
                 controller: fonoCtrl,
                 keyboardType: TextInputType.phone,
                 style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'Celular', labelStyle: TextStyle(color: Colors.yellow)),
+                decoration: InputDecoration(labelText: 'Celular (Opcional)', labelStyle: TextStyle(color: Colors.yellow)),
               ),
             ],
           ),
@@ -124,14 +134,20 @@ class _VentaScreenState extends State<VentaScreen> {
       );
       
       if (ok != true) return;
-      if (nombreCtrl.text.trim().isEmpty || fonoCtrl.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Nombre y celular son obligatorios'), backgroundColor: Colors.red));
+
+      nombreCliente = nombreCtrl.text.trim().isEmpty ? 'Cliente Varios' : nombreCtrl.text.trim();
+      telefonoCliente = fonoCtrl.text.trim();
+      dniCliente = dniCtrl.text.trim();
+      requiereComprobante = tipoVenta == 'ELECTRONICO';
+
+      if (tipoVenta == 'CREDITO' && nombreCliente == 'Cliente Varios') {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Para fiar, el nombre es obligatorio'), backgroundColor: Colors.red));
         return;
       }
-      
-      nombreCliente = nombreCtrl.text.trim();
-      telefonoCliente = fonoCtrl.text.trim();
-      clienteId = await db.registrarClienteSiNoExiste(nombreCliente, telefonoCliente);
+
+      if (dniCliente.isNotEmpty) {
+        clienteId = await db.registrarClienteSiNoExiste(nombreCliente, telefonoCliente, dniCliente);
+      }
     }
 
     final ventaData = {
@@ -142,9 +158,10 @@ class _VentaScreenState extends State<VentaScreen> {
       'tipo_venta': tipoVenta,
       'monto_total': _total,
       'vuelto': 0.0,
-      'tiene_comprobante': 0,
+      'tiene_comprobante': requiereComprobante ? 1 : 0,
       'nombre_cliente': nombreCliente,
       'telefono_cliente': telefonoCliente,
+      'dni_cliente': dniCliente,
     };
 
     final items = _carrito.map((item) => {
@@ -191,9 +208,6 @@ class _VentaScreenState extends State<VentaScreen> {
             flex: 3,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final width = (constraints.maxWidth - 16 - 8) / 2; 
-                final height = width / 1.5;
-                
                 return GridView.builder(
                   padding: const EdgeInsets.all(8.0),
                   physics: const PageScrollPhysics(), 
