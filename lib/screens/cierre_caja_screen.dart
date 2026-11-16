@@ -18,12 +18,16 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   int _cantidadTransacciones = 0;
   bool _isLoading = true;
 
+  // ID del punto de venta actual
   final int _puntoVentaId = 2;
 
   @override
   void initState() {
     super.initState();
-    _cargarResumenCaja();
+    // Usar addPostFrameCallback para asegurar que el Provider esté disponible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cargarResumenCaja();
+    });
   }
 
   Future<void> _cargarResumenCaja() async {
@@ -72,13 +76,11 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       await db.close();
 
       final dbPath = await getDatabasesPath();
-      
-      // CORRECCIÓN: Usa la constante exacta del DatabaseHelper
       final path = p.join(dbPath, DatabaseHelper.dbName); 
-      
       final dbFile = File(path);
 
       if (!await dbFile.exists()) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error: No se encontró la base de datos')),
         );
