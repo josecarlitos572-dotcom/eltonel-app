@@ -5,6 +5,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
+import '../services/database_helper.dart';
 
 class CierreCajaScreen extends StatefulWidget {
   @override
@@ -16,6 +18,9 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   int _cantidadTransacciones = 0;
   bool _isLoading = true;
 
+  // ID del punto de venta actual (debe coincidir con el de ventas)
+  final int _puntoVentaId = 2;
+
   @override
   void initState() {
     super.initState();
@@ -23,32 +28,53 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   }
 
   Future<void> _cargarResumenCaja() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
 
-    // AQUÍ DEBES CONECTAR CON TU BASE DE DATOS SQLITE
-    // Ejemplo:
-    // final db = await DatabaseHelper.instance.database;
-    // final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    // final ventas = await db.query('ventas', where: 'fecha = ?', whereArgs: [hoy]);
-    // _totalVentas = ventas.fold(0, (sum, item) => sum + (item['total'] as num));
-    // _cantidadTransacciones = ventas.length;
+    try {
+      final db = Provider.of<DatabaseHelper>(context, listen: false);
+      final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      // Consultar ventas de hoy para este punto de venta
+      final ventas = await db.consultar(
+        'ventas',
+        where: 'fecha LIKE ? AND punto_venta_id = ?',
+        whereArgs: ['$hoy%', _puntoVentaId],
+      );
 
-    // Simulación temporal para que la pantalla cargue
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    setState(() {
-      _totalVentas = 0.0; // REEMPLAZA POR TU TOTAL REAL
-      _cantidadTransacciones = 0; // REEMPLAZA POR TU CONTEO REAL
-      _isLoading = false;
-    });
+      double suma = 0.0;
+      for (var v in ventas) {
+        suma += (v['monto_total'] as num?)?.toDouble() ?? 0.0;
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalVentas = suma;
+          _cantidadTransacciones = ventas.length;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar resumen: $e')),
+        );
+      }
+    }
   }
 
   // --- FUNCIÓN REAL DE EXPORTACIÓN ---
-  Future<void> _exportarMIG(Context) async {
+  Future<void> _exportarMIG(BuildContext context) async {
     try {
-      // 1. Obtener la ruta de la base de datos (CAMBIA 'eltonel.db' por el nombre real de tu BD)
+      // 1. Cerrar la base de datos temporalmente para asegurar que los datos estén en el archivo principal
+      final dbHelper = Provider.of<DatabaseHelper>(context, listen: false);
+      final db = await dbHelper.database;
+      await db.close();
+
+      // 2. Obtener la ruta de la base de datos
       final dbPath = await getDatabasesPath();
       final path = p.join(dbPath, 'eltonel.db'); 
       final dbFile = File(path);
@@ -60,22 +86,39 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         return;
       }
 
-      // 2. Copiar a un archivo temporal con la fecha actual
+      // 3. Copiar a un archivo temporal con la fecha actual
       final directory = await getTemporaryDirectory();
       final fecha = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
       final exportPath = '${directory.path}/MIG_ElTonel_$fecha.db';
+      
+      // Copiamos los archivos. En Android, sqflite a veces genera archivos -wal y -shm
       await dbFile.copy(exportPath);
+      
+      // Si existen los archivos WAL y SHM, los adjuntamos también (para no perder datos recientes)
+      final walFile = File('$path-wal');
+      if (await walFile.exists()) {
+        await walFile.copy('$exportPath-wal');
+      }
+      final shmFile = File('$path-shm');
+      if (await shmFile.exists()) {
+        await shmFile.copy('$exportPath-shm');
+      }
 
-      // 3. Compartir por WhatsApp usando share_plus
+      // 4. Compartir por WhatsApp usando share_plus
       await Share.shareXFiles(
         [XFile(exportPath)],
-        text: 'Cierre de turno El Tonel - $fecha',
+        text: 'Cierre de turno El Tonel - $fecha\nTotal: S/ ${_totalVentas.toStringAsFixed(2)}\nTransacciones: $_cantidadTransacciones',
       );
       
+      // 5. Opcional: reabrir la base de datos después de compartir
+      // await dbHelper.database; 
+      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al exportar: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al exportar: $e')),
+        );
+      }
     }
   }
 
@@ -171,7 +214,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                         );
 
                         if (confirmar == true) {
-                          // Llama a la función real de exportación
                           await _exportarMIG(context);
                         }
                       },
