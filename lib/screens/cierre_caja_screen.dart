@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-// Importa tu ExportService (o la ruta donde tengas la función de exportar)
-// import '../services/export_service.dart'; 
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 
 class CierreCajaScreen extends StatefulWidget {
   @override
@@ -25,21 +28,55 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     });
 
     // AQUÍ DEBES CONECTAR CON TU BASE DE DATOS SQLITE
-    // Ejemplo con tu DatabaseHelper:
+    // Ejemplo:
     // final db = await DatabaseHelper.instance.database;
     // final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
     // final ventas = await db.query('ventas', where: 'fecha = ?', whereArgs: [hoy]);
     // _totalVentas = ventas.fold(0, (sum, item) => sum + (item['total'] as num));
     // _cantidadTransacciones = ventas.length;
 
-    // Simulación temporal para ver la UI
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Simulación temporal para que la pantalla cargue
+    await Future.delayed(const Duration(milliseconds: 300));
     
     setState(() {
-      _totalVentas = 0.0; // Pon aquí tu variable real
-      _cantidadTransacciones = 0; // Pon aquí tu variable real
+      _totalVentas = 0.0; // REEMPLAZA POR TU TOTAL REAL
+      _cantidadTransacciones = 0; // REEMPLAZA POR TU CONTEO REAL
       _isLoading = false;
     });
+  }
+
+  // --- FUNCIÓN REAL DE EXPORTACIÓN ---
+  Future<void> _exportarMIG(Context) async {
+    try {
+      // 1. Obtener la ruta de la base de datos (CAMBIA 'eltonel.db' por el nombre real de tu BD)
+      final dbPath = await getDatabasesPath();
+      final path = p.join(dbPath, 'eltonel.db'); 
+      final dbFile = File(path);
+
+      if (!await dbFile.exists()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: No se encontró la base de datos')),
+        );
+        return;
+      }
+
+      // 2. Copiar a un archivo temporal con la fecha actual
+      final directory = await getTemporaryDirectory();
+      final fecha = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+      final exportPath = '${directory.path}/MIG_ElTonel_$fecha.db';
+      await dbFile.copy(exportPath);
+
+      // 3. Compartir por WhatsApp usando share_plus
+      await Share.shareXFiles(
+        [XFile(exportPath)],
+        text: 'Cierre de turno El Tonel - $fecha',
+      );
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al exportar: $e')),
+      );
+    }
   }
 
   @override
@@ -134,15 +171,8 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                         );
 
                         if (confirmar == true) {
-                          // AQUÍ LLAMAS A TU FUNCIÓN DE EXPORTAR
-                          // Ejemplo: await ExportService().exportarMIGyEnviar(context);
-                          
-                          // Simulación de exportación exitosa:
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Archivo MIG generado y enviado a WhatsApp.')),
-                            );
-                          }
+                          // Llama a la función real de exportación
+                          await _exportarMIG(context);
                         }
                       },
                       icon: const Icon(Icons.send, size: 40),
