@@ -5,6 +5,9 @@ import 'admin_importar_db_screen.dart';
 import 'admin_backup_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
+import 'compra_screen.dart';
+import 'cxc_screen.dart';
+import 'rentabilidad_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   @override
@@ -90,7 +93,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void _navegar(Widget pantalla) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => pantalla));
-    _cargar(); // Recargar datos al volver
+    _cargar();
   }
 
   @override
@@ -146,7 +149,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             SizedBox(height: 20),
             
-            // SECCIÓN DE ACCIONES DEL ADMIN
             Text('ACCIONES RÁPIDAS',
                 style: TextStyle(
                     color: Colors.yellow,
@@ -193,6 +195,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Icons.cloud_upload,
                     Colors.green,
                     () => _navegar(AdminBackupScreen()),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _botonAccion(
+                    'CUENTAS X COBRAR',
+                    Icons.monetization_on,
+                    Colors.orange,
+                    () => _navegar(CxcScreen()),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _botonAccion(
+                    'RENTABILIDAD',
+                    Icons.trending_up,
+                    Colors.green,
+                    () => _navegar(RentabilidadScreen()),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _botonAccion(
+                    'REGISTRAR GASTO',
+                    Icons.shopping_cart,
+                    Colors.red,
+                    () => _navegar(CompraScreen()),
                   ),
                 ),
               ],
