@@ -3,11 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 import '../services/auth_service.dart';
+import 'pv_cierre_inventario_screen.dart';
 
 class CierreCajaScreen extends StatefulWidget {
   @override
@@ -19,6 +19,7 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
   int _cantidadTransacciones = 0;
   bool _isLoading = true;
   int _puntoVentaId = 0;
+  String _pvCodigo = '?';
 
   @override
   void initState() {
@@ -36,8 +37,15 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
       final auth = Provider.of<AuthService>(context, listen: false);
       
-      _puntoVentaId = auth.currentUser?['punto_venta_id_actual'] as int? ?? 2;
+      _puntoVentaId = auth.currentUser?['punto_venta_id_actual'] as int? ?? 0;
       
+      // Obtener el código del PV para el nombre del archivo
+      final db2 = await db.database;
+      final pvData = await db2.query('puntos_venta', where: 'id = ?', whereArgs: [_puntoVentaId]);
+      if (pvData.isNotEmpty) {
+        _pvCodigo = pvData.first['codigo'] as String? ?? 'PV$_puntoVentaId';
+      }
+
       final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
       
       final ventas = await db.consultar(
@@ -61,21 +69,18 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar resumen: $e')),
-        );
       }
     }
   }
 
-  Future<void> _exportarMIG(BuildContext context) async {
+  Future<void> _exportarJSONyEnviar(BuildContext context) async {
     try {
       final dbHelper = Provider.of<DatabaseHelper>(context, listen: false);
       final auth = Provider.of<AuthService>(context, listen: false);
       final usuarioId = auth.currentUser?['id'] as int? ?? 1;
       final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
       
-      // 1. Registrar el cierre en la base de datos ANTES de exportar
+      // 1. Registrar el cierre de caja
       await dbHelper.insertar('cierres_caja', {
         'fecha': hoy,
         'punto_venta_id': _puntoVentaId,
@@ -89,41 +94,55 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         'observaciones': 'Cierre generado por vendedor desde la app.',
       });
 
+      // 2. Consultar SOLO los datos del día y del punto de venta para exportar
       final db = await dbHelper.database;
-      await db.close();
-
-      final dbPath = await getDatabasesPath();
-      final path = p.join(dbPath, DatabaseHelper.dbName); 
-      final dbFile = File(path);
-
-      if (!await dbFile.exists()) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: No se encontró la base de datos')),
-        );
-        return;
+      
+      // Obtener IDs de ventas de hoy para este PV
+      final ventasIds = await db.query('ventas', 
+          columns: ['id'], 
+          where: 'fecha LIKE ? AND punto_venta_id = ?', 
+          whereArgs: ['$hoy%', _puntoVentaId]);
+      
+      List<int> ids = ventasIds.map((v) => v['id'] as int).toList();
+      
+      // Traer los detalles solo de esas ventas
+      List<Map<String, dynamic>> detalles = [];
+      if (ids.isNotEmpty) {
+        final placeholders = List.filled(ids.length, '?').join(',');
+        detalles = await db.query('detalle_venta', where: 'venta_id IN ($placeholders)', whereArgs: ids);
       }
 
+      final ventas = await db.query('ventas', where: 'fecha LIKE ? AND punto_venta_id = ?', whereArgs: ['$hoy%', _puntoVentaId]);
+      final cierres = await db.query('cierres_caja', where: 'fecha = ? AND punto_venta_id = ?', whereArgs: [hoy, _puntoVentaId]);
+      final mermas = await db.query('quiebres', where: 'fecha = ? AND punto_venta_id = ?', whereArgs: [hoy, _puntoVentaId]);
+      final inventario = await db.query('inventario', where: 'fecha = ? AND punto_venta_id = ?', whereArgs: [hoy, _puntoVentaId]);
+
+      final jsonExport = {
+        'tipo': 'CIERRE_DIA',
+        'fecha': hoy,
+        'punto_venta_codigo': _pvCodigo,
+        'data': {
+          'ventas': ventas,
+          'detalles': detalles,
+          'cierres': cierres,
+          'mermas': mermas,
+          'inventario': inventario,
+        }
+      };
+
+      final jsonStr = jsonEncode(jsonExport);
+      
+      // 3. Guardar archivo y compartir
       final directory = await getTemporaryDirectory();
-      final fecha = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
-      final exportPath = '${directory.path}/MIG_ElTonel_$fecha.db';
-      
-      await dbFile.copy(exportPath);
-      
-      final walFile = File('$path-wal');
-      if (await walFile.exists()) {
-        await walFile.copy('$exportPath-wal');
-      }
-      final shmFile = File('$path-shm');
-      if (await shmFile.exists()) {
-        await shmFile.copy('$exportPath-shm');
-      }
+      final fileName = 'CIERRE_${_pvCodigo}_$hoy.json';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsString(jsonStr);
 
       await Share.shareXFiles(
-        [XFile(exportPath)],
-        text: 'Cierre de turno El Tonel - $fecha\nPV: $_puntoVentaId\nTotal: S/ ${_totalVentas.toStringAsFixed(2)}\nTransacciones: $_cantidadTransacciones',
+        [XFile(file.path)],
+        text: 'Cierre El Tonel - $_pvCodigo - $hoy\nVentas: S/ ${_totalVentas.toStringAsFixed(2)}',
       );
-      
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -188,52 +207,54 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                   const SizedBox(height: 30),
 
                   const Text(
-                    'Al cerrar el turno, la app generará el archivo de la base de datos y se abrirá WhatsApp para enviarlo al administrador.',
+                    'Al cerrar el turno, la app generará el archivo JSON con las ventas, mermas y stock a cero.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   
                   const Spacer(),
 
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20.0),
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[800],
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 90),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        elevation: 5,
-                      ),
-                      onPressed: () async {
-                        final bool? confirmar = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('¿Cerrar Turno?'),
-                            content: const Text('Se enviará el archivo MIG a WhatsApp y no podrás hacer más ventas hasta que el admin reinicie el día.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: const Text('Cancelar'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(true),
-                                child: const Text('CERRAR Y ENVIAR', style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
-                          ),
-                        );
+                  // BOTÓN AL CIERRE DE INVENTARIO
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => PvCierreInventarioScreen()));
+                      _cargarResumenCaja(); // Recargar por si cambió algo
+                    },
+                    icon: Icon(Icons.inventory, color: Colors.black),
+                    label: Text('HACER CONTEÍDO FÍSICO'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 60),
+                    ),
+                  ),
 
-                        if (confirmar == true) {
-                          await _exportarMIG(context);
-                        }
-                      },
-                      icon: const Icon(Icons.send, size: 40),
-                      label: const Text(
-                        'CERRAR TURNO\nY ENVIAR MIG',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
+                  const SizedBox(height: 15),
+
+                  // BOTÓN DE EXPORTAR JSON
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final bool? confirmar = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('¿Exportar Cierre?'),
+                          content: const Text('Se generará el archivo JSON y se abrirá WhatsApp.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('EXPORTAR', style: TextStyle(color: Colors.red))),
+                          ],
+                        ),
+                      );
+                      if (confirmar == true) {
+                        await _exportarJSONyEnviar(context);
+                      }
+                    },
+                    icon: const Icon(Icons.send, size: 30),
+                    label: const Text('EXPORTAR CIERRE (.JSON)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[800],
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 80),
                     ),
                   ),
                 ],
