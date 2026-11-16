@@ -79,20 +79,22 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
         await db.actualizar('categorias_producto', data);
       } else {
         data['orden'] = _categorias.length + 1;
+        data['activo'] = 1; // Asegurar que nazca activa
         await db.insertar('categorias_producto', data);
       }
       _cargar();
     }
   }
 
-  Future<void> _eliminar(int id, String nombre) async {
+  Future<void> _cambiarEstado(int id, String nombre, bool activar) async {
+    final accion = activar ? 'reactivar' : 'desactivar';
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
-        title: Text('¿Eliminar?',
-            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
-        content: Text('Se desactivará "$nombre"',
+        title: Text('¿${accion.toUpperCase()}?',
+            style: TextStyle(color: activar ? Colors.green : Colors.red, fontFamily: 'CourierNew')),
+        content: Text('Se va a $accion "$nombre"',
             style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
         actions: [
           TextButton(
@@ -100,13 +102,16 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
               child: Text('NO', style: TextStyle(color: Colors.white))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text('SÍ', style: TextStyle(color: Colors.red))),
+              child: Text('SÍ', style: TextStyle(color: activar ? Colors.green : Colors.red))),
         ],
       ),
     );
     if (confirmar == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.actualizar('categorias_producto', {'id': id, 'activo': 0});
+      await db.actualizar('categorias_producto', {
+        'id': id,
+        'activo': activar ? 1 : 0,
+      });
       _cargar();
     }
   }
@@ -136,9 +141,9 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
                       style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
                     ),
                   ),
-                  title: Text(c['nombre'] ?? '',
+                  title: Text('${c['nombre'] ?? ''} ${activo ? "" : "(INACTIVO)"}',
                       style: TextStyle(color: activo ? Colors.white : Colors.white38, fontFamily: 'CourierNew')),
-                  subtitle: Text('Orden: ${c['orden'] ?? '-'} · ${activo ? "ACTIVO" : "INACTIVO"}',
+                  subtitle: Text('Orden: ${c['orden'] ?? '-'}',
                       style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 11)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -147,8 +152,9 @@ class _CategoriasProductoScreenState extends State<CategoriasProductoScreen> {
                           icon: Icon(Icons.edit, color: Colors.yellow),
                           onPressed: () => _editar(categoria: c)),
                       IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _eliminar(c['id'] as int, c['nombre'] ?? '')),
+                          icon: Icon(activo ? Icons.delete : Icons.restore, 
+                              color: activo ? Colors.red : Colors.green),
+                          onPressed: () => _cambiarEstado(c['id'] as int, c['nombre'] ?? '', !activo)),
                     ],
                   ),
                 );
