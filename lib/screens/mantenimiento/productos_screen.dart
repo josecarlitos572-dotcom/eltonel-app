@@ -13,6 +13,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
   List<Map<String, dynamic>> _puntosVenta = [];
   bool _cargando = true;
   String _busqueda = '';
+  bool _soloActivos = true;
 
   @override
   void initState() {
@@ -35,9 +36,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
   }
 
   List<Map<String, dynamic>> get _filtrados {
-    if (_busqueda.isEmpty) return _productos;
+    var list = _productos;
+    if (_soloActivos) {
+      list = list.where((p) => (p['activo'] ?? 1) == 1).toList();
+    }
+    if (_busqueda.isEmpty) return list;
     final q = _busqueda.toLowerCase();
-    return _productos.where((p) {
+    return list.where((p) {
       final cod = (p['codigo'] ?? '').toString().toLowerCase();
       final nom = (p['nombre'] ?? '').toString().toLowerCase();
       final cat = (p['categoria_nombre'] ?? '').toString().toLowerCase();
@@ -45,14 +50,15 @@ class _ProductosScreenState extends State<ProductosScreen> {
     }).toList();
   }
 
-  Future<void> _eliminar(int id, String nombre) async {
+  Future<void> _cambiarEstado(int id, String nombre, bool activar) async {
+    final accion = activar ? 'reactivar' : 'desactivar';
     final conf = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
-        title: Text('¿Desactivar?',
-            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
-        content: Text('Se desactivará "$nombre"',
+        title: Text('¿${accion.toUpperCase()}?',
+            style: TextStyle(color: activar ? Colors.green : Colors.red, fontFamily: 'CourierNew')),
+        content: Text('Se va a $accion "$nombre"',
             style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
         actions: [
           TextButton(
@@ -60,13 +66,18 @@ class _ProductosScreenState extends State<ProductosScreen> {
               child: Text('NO', style: TextStyle(color: Colors.white))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text('SÍ', style: TextStyle(color: Colors.red))),
+              child: Text('SÍ', style: TextStyle(color: activar ? Colors.green : Colors.red))),
         ],
       ),
     );
     if (conf == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.eliminarProductoLogico(id);
+      if (activar) {
+        await db.reactivarProducto(id);
+      } else {
+        await db.eliminarProductoLogico(id);
+      }
+      await db.getProductos(); // Refrescar caché
       _cargarTodo();
     }
   }
@@ -202,6 +213,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
             precios: precios,
           );
         }
+        await db.getProductos(); // Refrescar caché
         _cargarTodo();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -218,6 +230,11 @@ class _ProductosScreenState extends State<ProductosScreen> {
       appBar: AppBar(
         title: Text('PRODUCTOS (${filtrados.length})'),
         actions: [
+          IconButton(
+            icon: Icon(_soloActivos ? Icons.visibility : Icons.visibility_off, color: Colors.yellow),
+            tooltip: _soloActivos ? 'Mostrando solo activos' : 'Mostrando todos',
+            onPressed: () => setState(() => _soloActivos = !_soloActivos),
+          ),
           IconButton(icon: Icon(Icons.refresh), onPressed: _cargarTodo),
         ],
       ),
@@ -275,7 +292,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                               ),
                             ),
                             subtitle: Text(
-                              '${p['categoria_abrev'] ?? ''} - ${p['categoria_nombre'] ?? ''}',
+                              '${p['categoria_abrev'] ?? ''} - ${p['categoria_nombre'] ?? ''} ${activo ? "" : "(INACTIVO)"}',
                               style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 11),
                             ),
                             trailing: Row(
@@ -286,8 +303,10 @@ class _ProductosScreenState extends State<ProductosScreen> {
                                   onPressed: () => _abrirFormulario(producto: p),
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red, size: 20),
-                                  onPressed: () => _eliminar(p['id'] as int, p['nombre'] ?? ''),
+                                  icon: Icon(activo ? Icons.delete : Icons.restore, 
+                                      color: activo ? Colors.red : Colors.green, size: 20),
+                                  onPressed: () => _cambiarEstado(
+                                      p['id'] as int, p['nombre'] ?? '', !activo),
                                 ),
                               ],
                             ),
