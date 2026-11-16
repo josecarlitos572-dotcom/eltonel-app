@@ -23,10 +23,7 @@ class _VentaScreenState extends State<VentaScreen> {
 
   Future<void> _inicializar() async {
     final auth = Provider.of<AuthService>(context, listen: false);
-    
-    // Obtenemos el PV del usuario logueado. Si no, forzamos 2 (o 0 y bloqueamos).
     final pv = auth.currentUser?['punto_venta_id_actual'] as int? ?? 2;
-    
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final prods = await db.getProductos();
     
@@ -85,21 +82,69 @@ class _VentaScreenState extends State<VentaScreen> {
     });
   }
 
-  Future<void> _finalizarVenta() async {
+  Future<void> _finalizarVenta(String tipoVenta) async {
     final db = Provider.of<DatabaseHelper>(context, listen: false);
     final auth = Provider.of<AuthService>(context, listen: false);
     final usuarioId = auth.currentUser?['id'] as int? ?? 1;
     
+    String nombreCliente = 'Cliente Varios';
+    String telefonoCliente = '';
+    int? clienteId;
+
+    if (tipoVenta == 'CREDITO') {
+      final nombreCtrl = TextEditingController();
+      final fonoCtrl = TextEditingController();
+      
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.black,
+          title: Text('DATOS DEL CLIENTE (FIADO)', style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 14)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreCtrl,
+                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                decoration: InputDecoration(labelText: 'Nombre del cliente', labelStyle: TextStyle(color: Colors.yellow)),
+              ),
+              TextField(
+                controller: fonoCtrl,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
+                decoration: InputDecoration(labelText: 'Celular', labelStyle: TextStyle(color: Colors.yellow)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('CANCELAR', style: TextStyle(color: Colors.white))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('ACEPTAR', style: TextStyle(color: Colors.yellow))),
+          ],
+        ),
+      );
+      
+      if (ok != true) return;
+      if (nombreCtrl.text.trim().isEmpty || fonoCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Nombre y celular son obligatorios'), backgroundColor: Colors.red));
+        return;
+      }
+      
+      nombreCliente = nombreCtrl.text.trim();
+      telefonoCliente = fonoCtrl.text.trim();
+      clienteId = await db.registrarClienteSiNoExiste(nombreCliente, telefonoCliente);
+    }
+
     final ventaData = {
-      'cliente_id': null,
+      'cliente_id': clienteId,
       'usuario_id': usuarioId,
       'punto_venta_id': _puntoVentaId,
       'fecha': DateTime.now().toIso8601String(),
-      'tipo_venta': 'EFECTIVO',
+      'tipo_venta': tipoVenta,
       'monto_total': _total,
       'vuelto': 0.0,
       'tiene_comprobante': 0,
-      'nombre_cliente': 'Cliente Varios',
+      'nombre_cliente': nombreCliente,
+      'telefono_cliente': telefonoCliente,
     };
 
     final items = _carrito.map((item) => {
@@ -109,11 +154,11 @@ class _VentaScreenState extends State<VentaScreen> {
     }).toList();
 
     try {
-      await db.registrarVenta(ventaData, items);
+      await db.registrarVenta(ventaData, items, esCredito: tipoVenta == 'CREDITO');
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('¡Venta registrada! Total: S/ ${_total.toStringAsFixed(2)}')),
+        SnackBar(content: Text('Venta ($tipoVenta) registrada. Total: S/ ${_total.toStringAsFixed(2)}')),
       );
       
       setState(() {
@@ -211,23 +256,51 @@ class _VentaScreenState extends State<VentaScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.all(12.0),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            'TOTAL: S/ ${_total.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                          ),
+                        Text(
+                          'TOTAL: S/ ${_total.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(150, 60),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _carrito.isEmpty ? null : _finalizarVenta,
-                          child: const Text('COBRAR', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(0, 50),
+                                ),
+                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('EFECTIVO'),
+                                child: const Text('EFECTIVO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(0, 50),
+                                ),
+                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('ELECTRONICO'),
+                                child: const Text('YAPE/PLIN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(0, 50),
+                                ),
+                                onPressed: _carrito.isEmpty ? null : () => _finalizarVenta('CREDITO'),
+                                child: const Text('FIADO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
