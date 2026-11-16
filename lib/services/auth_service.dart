@@ -1,32 +1,53 @@
-import 'package:flutter/foundation.dart'; // REM: Fundamentos de Flutter para ChangeNotifier
-import 'database_helper.dart'; // REM: Importa el cerebro de datos que acabamos de crear
+import 'package:flutter/foundation.dart';
+import 'database_helper.dart';
 
-class AuthService extends ChangeNotifier { // REM: Servicio de autenticación que notifica cambios de estado
-  final DatabaseHelper dbHelper; // REM: Dependencia inyectada para acceder a la base de datos
-  Map<String, dynamic>? _currentUser; // REM: Variable privada que guarda los datos del usuario logueado
+class AuthService extends ChangeNotifier {
+  final DatabaseHelper dbHelper;
+  Map<String, dynamic>? _currentUser;
 
-  AuthService(this.dbHelper); // REM: Constructor que recibe la instancia de DatabaseHelper
+  AuthService(this.dbHelper);
 
-  Map<String, dynamic>? get currentUser => _currentUser; // REM: Getter público para leer el usuario actual
-  bool get isLoggedIn => _currentUser != null; // REM: Getter booleano para saber si hay sesión activa
+  Map<String, dynamic>? get currentUser => _currentUser;
+  bool get isLoggedIn => _currentUser != null;
 
-  Future<bool> login(String dni, String password) async { // REM: Función asíncrona de inicio de sesión
-    final db = await dbHelper.database; // REM: Obtiene la instancia de la base de datos
-    // REM: Busca en la tabla 'personal' coincidiendo DNI, contraseña y que esté activo (1)
+  Future<bool> login(String dni, String password) async {
+    final db = await dbHelper.database;
+    
     var user = await db.query('personal', 
       where: 'dni = ? AND password = ? AND activo = 1', 
       whereArgs: [dni, password]); 
     
-    if (user.isNotEmpty) { // REM: Si la consulta devuelve al menos un registro
-      _currentUser = user.first; // REM: Guarda ese usuario en la memoria de la sesión
-      notifyListeners(); // REM: Avisa a toda la app (ej. main.dart) que el estado de login cambió
-      return true; // REM: Retorna éxito
+    if (user.isNotEmpty) {
+      Map<String, dynamic> usuario = Map<String, dynamic>.from(user.first);
+
+      // Si es vendedor, buscamos a qué punto de venta está asignado HOY
+      if (usuario['rol'] == 'VENDEDOR') {
+        final hoy = DateTime.now().toIso8601String().split('T')[0];
+        final asignacion = await db.query('asignaciones_diarias',
+            where: 'usuario_id = ? AND fecha = ? AND estado = ?',
+            whereArgs: [usuario['id'], hoy, 'ACTIVO']);
+        
+        if (asignacion.isNotEmpty) {
+          usuario['punto_venta_id_actual'] = asignacion.first['punto_venta_id'];
+        } else {
+          // Si no hay asignación, el login fallará en el screen. 
+          // Le ponemos un valor por defecto para que no rompa.
+          usuario['punto_venta_id_actual'] = 0; 
+        }
+      } else {
+        // Si es ADMIN, no tiene punto de venta fijo
+        usuario['punto_venta_id_actual'] = 0; 
+      }
+
+      _currentUser = usuario; 
+      notifyListeners(); 
+      return true; 
     }
-    return false; // REM: Retorna fallo si no encontró coincidencias
+    return false; 
   }
 
-  void logout() { // REM: Función para cerrar sesión
-    _currentUser = null; // REM: Limpia la memoria del usuario actual
-    notifyListeners(); // REM: Avisa a la app que se cerró la sesión (para volver al Login)
+  void logout() {
+    _currentUser = null;
+    notifyListeners();
   }
 }
