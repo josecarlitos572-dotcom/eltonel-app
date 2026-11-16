@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 import '../services/auth_service.dart';
-import 'pv_cierre_inventario_screen.dart';
+import 'pv_cierre_inventario_screen.dart'; // Asegúrate de que esta ruta sea correcta
 
 class CierreCajaScreen extends StatefulWidget {
   @override
@@ -39,7 +39,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       
       _puntoVentaId = auth.currentUser?['punto_venta_id_actual'] as int? ?? 0;
       
-      // Obtener el código del PV para el nombre del archivo
       final db2 = await db.database;
       final pvData = await db2.query('puntos_venta', where: 'id = ?', whereArgs: [_puntoVentaId]);
       if (pvData.isNotEmpty) {
@@ -80,7 +79,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       final usuarioId = auth.currentUser?['id'] as int? ?? 1;
       final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
       
-      // 1. Registrar el cierre de caja
       await dbHelper.insertar('cierres_caja', {
         'fecha': hoy,
         'punto_venta_id': _puntoVentaId,
@@ -94,10 +92,8 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
         'observaciones': 'Cierre generado por vendedor desde la app.',
       });
 
-      // 2. Consultar SOLO los datos del día y del punto de venta para exportar
       final db = await dbHelper.database;
       
-      // Obtener IDs de ventas de hoy para este PV
       final ventasIds = await db.query('ventas', 
           columns: ['id'], 
           where: 'fecha LIKE ? AND punto_venta_id = ?', 
@@ -105,7 +101,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
       
       List<int> ids = ventasIds.map((v) => v['id'] as int).toList();
       
-      // Traer los detalles solo de esas ventas
       List<Map<String, dynamic>> detalles = [];
       if (ids.isNotEmpty) {
         final placeholders = List.filled(ids.length, '?').join(',');
@@ -132,7 +127,6 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
       final jsonStr = jsonEncode(jsonExport);
       
-      // 3. Guardar archivo y compartir
       final directory = await getTemporaryDirectory();
       final fileName = 'CIERRE_${_pvCodigo}_$hoy.json';
       final file = File('${directory.path}/$fileName');
@@ -159,17 +153,17 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cierre de Caja - El Tonel'),
-        backgroundColor: Colors.orange,
         automaticallyImplyLeading: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFC107)))
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Card(
+                    color: const Color(0xFF1E1E1E),
                     elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     child: Padding(
@@ -184,15 +178,15 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Transacciones:', style: TextStyle(fontSize: 18)),
-                              Text('$_cantidadTransacciones', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                              const Text('Transacciones:', style: TextStyle(fontSize: 18, color: Colors.white)),
+                              Text('$_cantidadTransacciones', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                             ],
                           ),
-                          const Divider(height: 30, thickness: 2),
+                          const Divider(height: 30, thickness: 2, color: Colors.white24),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('TOTAL EN CAJA:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const Text('TOTAL EN CAJA:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                               Text(
                                 'S/ ${_totalVentas.toStringAsFixed(2)}',
                                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.green),
@@ -214,14 +208,13 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                   
                   const Spacer(),
 
-                  // BOTÓN AL CIERRE DE INVENTARIO
                   ElevatedButton.icon(
                     onPressed: () async {
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => PvCierreInventarioScreen()));
-                      _cargarResumenCaja(); // Recargar por si cambió algo
+                      _cargarResumenCaja();
                     },
-                    icon: Icon(Icons.inventory, color: Colors.black),
-                    label: Text('HACER CONTEÍDO FÍSICO'),
+                    icon: const Icon(Icons.inventory, color: Colors.black),
+                    label: const Text('HACER CONTEÍDO FÍSICO'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueGrey,
                       foregroundColor: Colors.white,
@@ -231,16 +224,16 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
 
                   const SizedBox(height: 15),
 
-                  // BOTÓN DE EXPORTAR JSON
                   ElevatedButton.icon(
                     onPressed: () async {
                       final bool? confirmar = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('¿Exportar Cierre?'),
-                          content: const Text('Se generará el archivo JSON y se abrirá WhatsApp.'),
+                          backgroundColor: const Color(0xFF1E1E1E),
+                          title: const Text('¿Exportar Cierre?', style: TextStyle(color: Colors.white)),
+                          content: const Text('Se generará el archivo JSON y se abrirá WhatsApp.', style: TextStyle(color: Colors.white70)),
                           actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar', style: TextStyle(color: Colors.white))),
                             TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('EXPORTAR', style: TextStyle(color: Colors.red))),
                           ],
                         ),
@@ -249,11 +242,10 @@ class _CierreCajaScreenState extends State<CierreCajaScreen> {
                         await _exportarJSONyEnviar(context);
                       }
                     },
-                    icon: const Icon(Icons.send, size: 30),
-                    label: const Text('EXPORTAR CIERRE (.JSON)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.send, size: 30, color: Colors.white),
+                    label: const Text('EXPORTAR CIERRE (.JSON)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red[800],
-                      foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 80),
                     ),
                   ),
