@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_helper.dart';
@@ -86,25 +87,23 @@ class _CategoriasGastoScreenState extends State<CategoriasGastoScreen> {
         data['id'] = categoria['id'];
         await db.actualizar('categorias_gasto', data);
       } else {
+        data['activo'] = 1;
         await db.insertar('categorias_gasto', data);
       }
       _cargar();
     }
   }
 
-  Future<void> _eliminar(int id, String nombre) async {
+  Future<void> _cambiarEstado(int id, String nombre, bool activar) async {
+    final accion = activar ? 'reactivar' : 'desactivar';
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.black,
-        title: Text(
-          '¿Eliminar?',
-          style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew'),
-        ),
-        content: Text(
-          'Se desactivará "$nombre"',
-          style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-        ),
+        title: Text('¿${accion.toUpperCase()}?',
+            style: TextStyle(color: activar ? Colors.green : Colors.red, fontFamily: 'CourierNew')),
+        content: Text('Se va a $accion "$nombre"',
+            style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -112,14 +111,17 @@ class _CategoriasGastoScreenState extends State<CategoriasGastoScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('SÍ', style: TextStyle(color: Colors.red)),
+            child: Text('SÍ', style: TextStyle(color: activar ? Colors.green : Colors.red)),
           ),
         ],
       ),
     );
     if (confirmar == true) {
       final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.actualizar('categorias_gasto', {'id': id, 'activo': 0});
+      await db.actualizar('categorias_gasto', {
+        'id': id,
+        'activo': activar ? 1 : 0,
+      });
       _cargar();
     }
   }
@@ -151,14 +153,14 @@ class _CategoriasGastoScreenState extends State<CategoriasGastoScreen> {
                     ),
                   ),
                   title: Text(
-                    c['nombre'] ?? '',
+                    '${c['nombre'] ?? ''} ${activo ? "" : "(INACTIVO)"}',
                     style: TextStyle(
                       color: activo ? Colors.white : Colors.white38,
                       fontFamily: 'CourierNew',
                     ),
                   ),
                   subtitle: Text(
-                    'Límite: S/ ${(c['limite_max'] ?? 0).toString()} · ${activo ? "ACTIVO" : "INACTIVO"}',
+                    'Límite: S/ ${(c['limite_max'] ?? 0).toString()}',
                     style: TextStyle(
                       color: Colors.white54,
                       fontFamily: 'CourierNew',
@@ -173,9 +175,10 @@ class _CategoriasGastoScreenState extends State<CategoriasGastoScreen> {
                         onPressed: () => _editar(categoria: c),
                       ),
                       IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () =>
-                            _eliminar(c['id'] as int, c['nombre'] ?? ''),
+                        icon: Icon(activo ? Icons.delete : Icons.restore,
+                            color: activo ? Colors.red : Colors.green),
+                        onPressed: () => _cambiarEstado(
+                            c['id'] as int, c['nombre'] ?? '', !activo),
                       ),
                     ],
                   ),
