@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
-import 'admin_importar_db_screen.dart'; // <-- IMPORTACIÓN AGREGADA
+import 'admin_importar_db_screen.dart';
+import 'admin_backup_screen.dart';
+import 'admin_activar_vendedor_screen.dart';
+import 'mantenimiento/mantenimiento_menu_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   @override
@@ -85,6 +88,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  void _navegar(Widget pantalla) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => pantalla));
+    _cargar(); // Recargar datos al volver
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
@@ -136,28 +144,58 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: _tarjetaInt('QUIEBRES', _totalQuiebres, Colors.orange)),
               ],
             ),
-            
-            // BOTÓN DE IMPORTACIÓN AGREGADO AQUÍ
             SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => AdminImportarDbScreen()),
-                );
-                _cargar(); // Recargar al volver
-              },
-              icon: Icon(Icons.upload_file, color: Colors.black),
-              label: Text('IMPORTAR DATOS DE VENDEDOR'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
-                backgroundColor: Colors.yellow,
-                foregroundColor: Colors.black,
-                textStyle: TextStyle(
+            
+            // SECCIÓN DE ACCIONES DEL ADMIN
+            Text('ACCIONES RÁPIDAS',
+                style: TextStyle(
+                    color: Colors.yellow,
                     fontFamily: 'CourierNew',
                     fontWeight: FontWeight.bold,
-                    fontSize: 14),
-              ),
+                    fontSize: 13)),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _botonAccion(
+                    'ACTIVAR VENDEDOR',
+                    Icons.play_circle_fill,
+                    Colors.orange,
+                    () => _navegar(AdminActivarVendedorScreen()),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _botonAccion(
+                    'IMPORTAR VENTAS',
+                    Icons.upload_file,
+                    Colors.yellow,
+                    () => _navegar(AdminImportarDbScreen()),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _botonAccion(
+                    'MANTENIMIENTO',
+                    Icons.build,
+                    Colors.blue,
+                    () => _navegar(MantenimientoMenuScreen()),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _botonAccion(
+                    'BACKUP SISTEMA',
+                    Icons.cloud_upload,
+                    Colors.green,
+                    () => _navegar(AdminBackupScreen()),
+                  ),
+                ),
+              ],
             ),
 
             SizedBox(height: 20),
@@ -316,6 +354,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   fontFamily: 'CourierNew',
                   fontWeight: FontWeight.bold,
                   fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _botonAccion(String texto, IconData icono, Color color, VoidCallback accion) {
+    return ElevatedButton(
+      onPressed: accion,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Color(0xFF1A1A1A),
+        foregroundColor: color,
+        padding: EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: color, width: 1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icono, size: 28, color: color),
+          SizedBox(height: 6),
+          Text(
+            texto,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'CourierNew',
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
