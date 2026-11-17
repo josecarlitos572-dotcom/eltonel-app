@@ -1,5 +1,10 @@
+// ============================================================
+// main.dart — Punto de entrada de la app "Desayunos El Tonel"
+// Inicializa Flutter, configura providers y lanza la UI
+// ============================================================
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Necesario para inicialización de plugins
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'services/database_helper.dart';
@@ -7,7 +12,7 @@ import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 
 void main() {
-  // ⚠️ ESTA LÍNEA ES OBLIGATORIA PARA QUE SQFLITE FUNCIONE AL ARRANCAR
+  // CRÍTICO: Inicializa los bindings de Flutter antes de usar sqflite
   WidgetsFlutterBinding.ensureInitialized();
 
   runApp(
@@ -56,18 +61,39 @@ class ElTonelApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFFC107),
             foregroundColor: Colors.black,
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'CourierNew'),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'CourierNew',
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF2C2C2C),
-          labelStyle: const TextStyle(color: Colors.white70, fontFamily: 'CourierNew'),
-          hintStyle: const TextStyle(color: Colors.white30, fontFamily: 'CourierNew'),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2)),
+          labelStyle: const TextStyle(
+            color: Colors.white70,
+            fontFamily: 'CourierNew',
+          ),
+          hintStyle: const TextStyle(
+            color: Colors.white30,
+            fontFamily: 'CourierNew',
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+              color: Color(0xFFFFC107),
+              width: 2,
+            ),
+          ),
         ),
       ),
       home: InactivityWrapper(child: LoginScreen()),
@@ -75,6 +101,7 @@ class ElTonelApp extends StatelessWidget {
   }
 }
 
+// Wrapper que cierra sesión tras 10 minutos de inactividad
 class InactivityWrapper extends StatefulWidget {
   final Widget child;
   const InactivityWrapper({Key? key, required this.child}) : super(key: key);
@@ -85,7 +112,7 @@ class InactivityWrapper extends StatefulWidget {
 
 class _InactivityWrapperState extends State<InactivityWrapper> {
   Timer? _timer;
-  
+
   @override
   void initState() {
     super.initState();
@@ -99,8 +126,8 @@ class _InactivityWrapperState extends State<InactivityWrapper> {
         final auth = Provider.of<AuthService>(context, listen: false);
         auth.logout();
         Navigator.pushReplacement(
-          context, 
-          MaterialPageRoute(builder: (_) => LoginScreen())
+          context,
+          MaterialPageRoute(builder: (_) => LoginScreen()),
         );
       }
     });
