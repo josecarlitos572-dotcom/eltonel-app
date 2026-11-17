@@ -1,42 +1,57 @@
+# ============================================================
+# Nombre: build-apk.yml
+# Descripción: Workflow de GitHub Actions para compilar APK Flutter
+# Cambios: Se mantiene la estructura estable. El error de compileSdk=35
+#          en el log es solo una advertencia de Gradle, no una inyección
+#          de este archivo. El problema real son los íconos (siguiente paso).
+# ============================================================
+
 name: Build Flutter APK
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: # Permite ejecutar manualmente desde la pestaña Actions
 
 jobs:
   build:
-    name: Compilar APK en la Nube
+    name: Compilar APK de Producción
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Clonar el código del repositorio
       - name: Clonar Repositorio
         uses: actions/checkout@v4
 
+      # 2. Configurar el entorno Java (Requisito para Android/Gradle)
       - name: Configurar Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin' # CAMBIO: Zulu -> Temurin (más estable para Flutter)
+          distribution: 'temurin'
           java-version: '17'
 
+      # 3. Configurar Flutter (Versión estable)
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-          cache: true # NUEVO: Acelera compilaciones futuras
+          cache: true
 
+      # 4. Limpiar caché anterior para evitar conflictos
       - name: Limpiar proyecto
-        run: flutter clean # NUEVO: Evita conflictos de caché previos
+        run: flutter clean
 
+      # 5. Descargar dependencias (pubspec.yaml)
       - name: Instalar Dependencias
         run: flutter pub get
 
+      # 6. Compilar el APK en modo Release (Producción)
       - name: Compilar APK de Producción
         run: flutter build apk --release
 
+      # 7. Subir el APK generado para poder descargarlo desde GitHub
       - name: Subir APK como Artefacto
         uses: actions/upload-artifact@v4
         with:
