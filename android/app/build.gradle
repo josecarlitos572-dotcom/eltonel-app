@@ -1,8 +1,9 @@
 // ============================================================
 // android/app/build.gradle
 // Módulo Android de "eltonel_full"
-// compileSdk 35 (requerido por flutter_plugin_android_lifecycle)
-// minSdk 21 (Android 5.0+)
+// CORRECCIÓN CRÍTICA: namespace/applicationId = com.eltonel.app
+// (debe coincidir con el paquete real de MainActivity.kt)
+// compileSdk 35 · minSdk 21
 // ============================================================
 
 plugins {
@@ -13,65 +14,65 @@ plugins {
 
 // --- Lectura de local.properties (SDK de Flutter y versiones) ---
 def localProperties = new Properties()           // Objeto para leer pares clave=valor
-def localPropertiesFile = rootProject.file('local.properties')  // Apunta al archivo generado por Flutter
-if (localPropertiesFile.exists()) {              // Solo si el archivo existe (en CI puede no existir)
+def localPropertiesFile = rootProject.file('local.properties')  // Archivo generado por Flutter
+if (localPropertiesFile.exists()) {              // Solo si existe (en CI puede no existir)
     localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)             // Carga flutter.sdk, flutter.versionCode, etc.
+        localProperties.load(reader)             // Carga flutter.sdk, versionCode, etc.
     }
 }
 
 def flutterRoot = localProperties.getProperty('flutter.sdk')   // Ruta del SDK de Flutter
 if (flutterRoot == null) {
-    flutterRoot = ''                             // Valor vacío: el plugin de Flutter lo resuelve solo
+    flutterRoot = ''                             // Vacío: el plugin de Flutter lo resuelve
 }
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')  // Código de versión (entero)
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')  // Código de versión
 if (flutterVersionCode == null) {
-    flutterVersionCode = '1'                     // Valor por defecto si no está definido
+    flutterVersionCode = '1'                     // Valor por defecto
 }
 
-def flutterVersionName = localProperties.getProperty('flutter.versionName')  // Nombre de versión (texto)
+def flutterVersionName = localProperties.getProperty('flutter.versionName')  // Nombre de versión
 if (flutterVersionName == null) {
     flutterVersionName = '1.0'                   // Valor por defecto
 }
 
 android {
-    namespace "com.example.eltonel_full"         // Identificador único del paquete en el código R.java
-    compileSdkVersion 35                         // CAMBIO: 34 → 35 (exigido por flutter_plugin_android_lifecycle)
-    ndkVersion flutter.ndkVersion                // Versión del NDK que define Flutter (evita conflictos)
+    namespace "com.eltonel.app"                  // ✅ CORREGIDO: coincide con package de MainActivity.kt
+    compileSdkVersion 35                         // Requerido por flutter_plugin_android_lifecycle
+    ndkVersion flutter.ndkVersion                // NDK que define Flutter (evita conflictos)
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8  // Sintaxis Java compatible con JDK 8
-        targetCompatibility JavaVersion.VERSION_1_8  // Bytecode generado para JDK 8
+        sourceCompatibility JavaVersion.VERSION_1_8  // Sintaxis Java compatible JDK 8
+        targetCompatibility JavaVersion.VERSION_1_8  // Bytecode para JDK 8
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'                        // Kotlin compila hacia el mismo target de Java 8
+        jvmTarget = '1.8'                        // Kotlin hacia el mismo target Java 8
     }
 
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'   // Incluye la carpeta de código Kotlin en la compilación
+        main.java.srcDirs += 'src/main/kotlin'   // Incluye el código Kotlin (com/eltonel/app)
     }
 
     defaultConfig {
-        applicationId "com.example.eltonel_full" // ID público de la app (Play Store / instalador)
-        minSdkVersion 21                         // Android 5.0+ (íconos PNG en mipmap-* normales)
-        targetSdkVersion 35                      // CAMBIO: 34 → 35 (debe coincidir con compileSdk)
-        versionCode flutterVersionCode.toInteger()  // Número interno de versión (viene de pubspec)
+        applicationId "com.eltonel.app"          // ✅ CORREGIDO: identidad real de la app
+        minSdkVersion 21                         // Android 5.0+
+        targetSdkVersion 35                      // Coincide con compileSdk
+        versionCode flutterVersionCode.toInteger()  // Número interno (viene de pubspec)
         versionName flutterVersionName           // Versión visible (ej. "1.0.0")
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug   // Firma debug para pruebas (cambiar a keystore propio para Play Store)
+            signingConfig signingConfigs.debug   // Firma debug para pruebas
         }
     }
 }
 
 flutter {
-    source '../..'                               // Indica a Gradle dónde está el código Dart del proyecto
+    source '../..'                               // Código Dart del proyecto
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"  // Librería estándar de Kotlin
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"  // Stdlib Kotlin
 }
