@@ -1,6 +1,6 @@
 # ============================================================
 # build-apk.yml — Workflow de GitHub Actions para El Tonel
-# Genera íconos automáticamente y compila el APK
+# Genera íconos, elimina recursos duplicados y compila el APK
 # ============================================================
 
 name: Build Flutter APK
@@ -48,11 +48,15 @@ jobs:
       - name: Generar Íconos de App
         run: dart run flutter_launcher_icons
 
-      # 7. Compilar APK
+      # 7. Eliminar archivo de colores duplicado generado por el plugin
+      - name: Eliminar Recursos Duplicados
+        run: rm -f android/app/src/main/res/values/ic_launcher_colors.xml
+
+      # 8. Compilar APK
       - name: Compilar APK de Producción
         run: flutter build apk --release
 
-      # 8. Subir APK
+      # 9. Subir APK
       - name: Subir APK como Artefacto
         uses: actions/upload-artifact@v4
         with:
