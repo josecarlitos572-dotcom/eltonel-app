@@ -1,15 +1,10 @@
-// ============================================================
-// admin_dashboard_screen.dart — Panel del ADMIN
-// Cambio: enlaza AdminGenerarBatchScreen (antes inalcanzable).
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 import 'admin_importar_db_screen.dart';
 import 'admin_backup_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
-import 'admin_generar_batch_screen.dart'; // NUEVO
+import 'admin_generar_batch_screen.dart';
 import 'mantenimiento/mantenimiento_menu_screen.dart';
 import 'compra_screen.dart';
 import 'cxc_screen.dart';
@@ -61,7 +56,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       appBar: AppBar(title: const Text('DASHBOARD DEL DÍA'), backgroundColor: Colors.black, actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)]),
       backgroundColor: Colors.black,
       body: SingleChildScrollView(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('RESUMEN GENERAL — $_hoy', style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 13)),
+        Text('RESUMEN GENERAL — $_hoy', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 10),
         Row(children: [Expanded(child: _tarjeta('VENTAS', _totalVentas, Colors.green)), const SizedBox(width: 8), Expanded(child: _tarjeta('GASTOS', _totalGastos, Colors.red))]),
         const SizedBox(height: 8),
@@ -72,7 +67,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Row(children: [
           Expanded(child: _botonAccion('ACTIVAR VENDEDOR', Icons.play_circle_fill, Colors.orange, () => _navegar(AdminActivarVendedorScreen()))),
           const SizedBox(width: 8),
-          Expanded(child: _botonAccion('GENERAR BATCH', Icons.send, Colors.yellow, () => _navegar(AdminGenerarBatchScreen()))), // NUEVO
+          Expanded(child: _botonAccion('GENERAR BATCH', Icons.send, Colors.yellow, () => _navegar(AdminGenerarBatchScreen()))),
         ]),
         const SizedBox(height: 8),
         Row(children: [
