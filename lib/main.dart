@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'services/database_helper.dart';
@@ -6,18 +7,25 @@ import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 
 void main() {
+  // ⚠️ ESTA LÍNEA ES OBLIGATORIA PARA QUE SQFLITE FUNCIONE AL ARRANCAR
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DatabaseHelper()),
-        ChangeNotifierProvider(create: (context) => AuthService(context.read<DatabaseHelper>())),
+        ChangeNotifierProvider(
+          create: (context) => AuthService(context.read<DatabaseHelper>()),
+        ),
       ],
-      child: ElTonelApp(),
+      child: const ElTonelApp(),
     ),
   );
 }
 
 class ElTonelApp extends StatelessWidget {
+  const ElTonelApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -72,7 +80,7 @@ class InactivityWrapper extends StatefulWidget {
   const InactivityWrapper({Key? key, required this.child}) : super(key: key);
 
   @override
-  _InactivityWrapperState createState() => _InactivityWrapperState();
+  State<InactivityWrapper> createState() => _InactivityWrapperState();
 }
 
 class _InactivityWrapperState extends State<InactivityWrapper> {
@@ -90,7 +98,10 @@ class _InactivityWrapperState extends State<InactivityWrapper> {
       if (mounted) {
         final auth = Provider.of<AuthService>(context, listen: false);
         auth.logout();
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
+        Navigator.pushReplacement(
+          context, 
+          MaterialPageRoute(builder: (_) => LoginScreen())
+        );
       }
     });
   }
@@ -99,7 +110,7 @@ class _InactivityWrapperState extends State<InactivityWrapper> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _resetTimer,
-      onPanStart: (_) => _resetTimer(),
+      onPanDown: (_) => _resetTimer(),
       child: widget.child,
     );
   }
