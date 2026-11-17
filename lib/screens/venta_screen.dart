@@ -19,7 +19,6 @@ class VentaScreen extends StatefulWidget {
 }
 
 class _VentaScreenState extends State<VentaScreen> {
-  // --- Paleta de marca ---
   static const Color _amber = Color(0xFFFFC107);
   static const Color _bg = Color(0xFF121212);
   static const Color _surface = Color(0xFF1E1E1E);
@@ -29,17 +28,16 @@ class _VentaScreenState extends State<VentaScreen> {
   static const Color _plin = Color(0xFF00A9E0);
   static const Color _red = Color(0xFFD32F2F);
 
-  // --- Estado de datos ---
-  List<Map<String, dynamic>> _productos = [];   // activos
-  List<Map<String, dynamic>> _categorias = [];  // activas
-  Map<int, double> _precios = {};               // productoId -> precio del PV
-  Map<int, int> _stock = {};                    // productoId -> stock de hoy
-  int? _pvId;                                   // PV operativo del usuario
-  int? _catId;                                  // categoría activa (null = primera)
-  String _query = '';                           // búsqueda
+  List<Map<String, dynamic>> _productos = [];
+  List<Map<String, dynamic>> _categorias = [];
+  Map<int, double> _precios = {};
+  Map<int, int> _stock = {};
+  int? _pvId;
+  int? _catId;
+  String _query = '';
   bool _cargando = true;
   bool _procesando = false;
-  final List<Map<String, dynamic>> _cart = [];  // {id,codigo,nombre,price,qty}
+  final List<Map<String, dynamic>> _cart = [];
 
   double get _total => _cart.fold(0.0, (s, l) => s + ((l['price'] as double) * (l['qty'] as int)));
   int get _units => _cart.fold(0, (s, l) => s + (l['qty'] as int));
@@ -50,11 +48,9 @@ class _VentaScreenState extends State<VentaScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargar());
   }
 
-  // Carga productos, categorías, precios y stock del PV del usuario.
   Future<void> _cargar() async {
     final db = context.read<DatabaseHelper>();
     final auth = context.read<AuthService>();
-    // AuthService publica 'punto_venta_id_actual' (asignación de hoy).
     _pvId = (auth.currentUser?['punto_venta_id_actual'] as int?) ??
         (auth.currentUser?['punto_venta_id'] as int?) ?? 0;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
@@ -69,7 +65,6 @@ class _VentaScreenState extends State<VentaScreen> {
     if (mounted) setState(() => _cargando = false);
   }
 
-  // Precios y stock del PV en dos consultas agrupadas.
   Future<void> _cargarPreciosYStock(String hoy) async {
     if (_pvId == null || _pvId == 0) { _precios = {}; _stock = {}; return; }
     final db = context.read<DatabaseHelper>();
@@ -91,7 +86,6 @@ class _VentaScreenState extends State<VentaScreen> {
     ));
   }
 
-  // Agrega si hay precio y stock disponible.
   void _agregar(Map<String, dynamic> p) {
     final id = p['id'] as int;
     final precio = _precios[id] ?? 0.0;
@@ -121,7 +115,6 @@ class _VentaScreenState extends State<VentaScreen> {
     _aviso('Carrito vaciado', _red, accion: 'DESHACER', onAccion: () => setState(() => _cart.addAll(copia)));
   }
 
-  // Productos visibles: categoría activa + búsqueda.
   List<Map<String, dynamic>> get _visibles {
     final q = _query.trim().toLowerCase();
     return _productos.where((p) {
@@ -133,7 +126,6 @@ class _VentaScreenState extends State<VentaScreen> {
 
   bool get _sinStock => _pvId != null && _pvId != 0 && _stock.values.every((v) => v <= 0);
 
-  // --- Cobro ---
   Future<void> _cobrar(String tipo) async {
     if (_cart.isEmpty || _procesando) return;
     if (_pvId == null || _pvId == 0) { _aviso('PV sin asignar', _red); return; }
@@ -148,7 +140,9 @@ class _VentaScreenState extends State<VentaScreen> {
     } else if (tipo == 'FIADO' || tipo == 'ELECTRONICO') {
       final c = await _dialogoCliente(tipo);
       if (c == null) return;
-      nombre = c['nombre']; fono = c['fono']; dni = c['dni'];
+      nombre = c['nombre'] ?? 'Consumidor Final';
+      fono = c['fono'] ?? '';
+      dni = c['dni'] ?? '';
       if (tipo == 'FIADO' && nombre == 'Consumidor Final') { _aviso('Para fiar se requiere nombre', _red); return; }
       if (dni.isNotEmpty) {
         final db = context.read<DatabaseHelper>();
@@ -177,7 +171,7 @@ class _VentaScreenState extends State<VentaScreen> {
       await db.registrarVenta(ventaData, items, esCredito: tipo == 'FIADO');
       final monto = _total;
       setState(() { _cart.clear(); });
-      await _cargarPreciosYStock(DateTime.now().toIso8601String().split('T')[0]); // refresca stock
+      await _cargarPreciosYStock(DateTime.now().toIso8601String().split('T')[0]);
       _aviso('Venta $tipo · S/ ${monto.toStringAsFixed(2)}', _green);
     } catch (e) {
       _aviso('No se pudo registrar: $e', _red);
@@ -185,7 +179,6 @@ class _VentaScreenState extends State<VentaScreen> {
     if (mounted) setState(() => _procesando = false);
   }
 
-  // Diálogo efectivo con vuelto en vivo; retorna vuelto o null.
   Future<double?> _dialogoEfectivo() {
     final ctrl = TextEditingController();
     double recibido = 0;
@@ -217,7 +210,6 @@ class _VentaScreenState extends State<VentaScreen> {
     ).then((v) => v == null || v < 0 ? null : v);
   }
 
-  // Diálogo cliente (fiado/comanda) con escáner de DNI; retorna datos o null.
   Future<Map<String, String>?> _dialogoCliente(String tipo) {
     final n = TextEditingController(), f = TextEditingController(), d = TextEditingController();
     return showDialog<Map<String, String>>(
@@ -275,7 +267,6 @@ class _VentaScreenState extends State<VentaScreen> {
   @override
   Widget build(BuildContext context) {
     if (_cargando) return const Center(child: CircularProgressIndicator(color: _amber));
-    // Puerta de apertura: sin stock del día, el POS muestra recepción.
     if (_sinStock) {
       return Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.inventory_2_outlined, size: 72, color: _amber),
