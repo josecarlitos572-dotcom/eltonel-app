@@ -1,9 +1,3 @@
-// ============================================================
-// venta_screen.dart — POS de El Tonel (v1.1)
-// Categoría-primero · precio y stock del PV asignado · puerta de
-// apertura de día · cobro efectivo/Yape·Plin/Fiado con escáner DNI.
-// ============================================================
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
