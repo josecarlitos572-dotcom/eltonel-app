@@ -4,7 +4,7 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Necesario para inicialización de plugins
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'services/database_helper.dart';
@@ -44,14 +44,15 @@ class ElTonelApp extends StatelessWidget {
           secondary: Color(0xFFFFC107),
           surface: Color(0xFF1E1E1E),
         ),
-        fontFamily: 'CourierNew',
+        // ✅ CAMBIO: Fuente Roboto (estándar de Android, no requiere configuración)
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E1E1E),
           foregroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
           titleTextStyle: TextStyle(
-            fontFamily: 'CourierNew',
+            fontFamily: 'Roboto',
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -64,7 +65,7 @@ class ElTonelApp extends StatelessWidget {
             textStyle: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              fontFamily: 'CourierNew',
+              fontFamily: 'Roboto',
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -77,11 +78,11 @@ class ElTonelApp extends StatelessWidget {
           fillColor: const Color(0xFF2C2C2C),
           labelStyle: const TextStyle(
             color: Colors.white70,
-            fontFamily: 'CourierNew',
+            fontFamily: 'Roboto',
           ),
           hintStyle: const TextStyle(
             color: Colors.white30,
-            fontFamily: 'CourierNew',
+            fontFamily: 'Roboto',
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
