@@ -1,9 +1,6 @@
 # ============================================================
-# Nombre: build-apk.yml
-# Descripción: Workflow de GitHub Actions para compilar APK Flutter
-# Cambios: Se mantiene la estructura estable. El error de compileSdk=35
-#          en el log es solo una advertencia de Gradle, no una inyección
-#          de este archivo. El problema real son los íconos (siguiente paso).
+# build-apk.yml — Workflow de GitHub Actions para El Tonel
+# Genera íconos automáticamente y compila el APK
 # ============================================================
 
 name: Build Flutter APK
@@ -12,7 +9,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Permite ejecutar manualmente desde la pestaña Actions
+  workflow_dispatch:
 
 jobs:
   build:
@@ -20,18 +17,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Clonar el código del repositorio
+      # 1. Clonar el repositorio
       - name: Clonar Repositorio
         uses: actions/checkout@v4
 
-      # 2. Configurar el entorno Java (Requisito para Android/Gradle)
+      # 2. Configurar Java
       - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. Configurar Flutter (Versión estable)
+      # 3. Configurar Flutter
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -39,19 +36,23 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 4. Limpiar caché anterior para evitar conflictos
+      # 4. Limpiar caché
       - name: Limpiar proyecto
         run: flutter clean
 
-      # 5. Descargar dependencias (pubspec.yaml)
+      # 5. Instalar dependencias (incluye flutter_launcher_icons)
       - name: Instalar Dependencias
         run: flutter pub get
 
-      # 6. Compilar el APK en modo Release (Producción)
+      # 6. Generar íconos automáticamente
+      - name: Generar Íconos de App
+        run: dart run flutter_launcher_icons
+
+      # 7. Compilar APK
       - name: Compilar APK de Producción
         run: flutter build apk --release
 
-      # 7. Subir el APK generado para poder descargarlo desde GitHub
+      # 8. Subir APK
       - name: Subir APK como Artefacto
         uses: actions/upload-artifact@v4
         with:
