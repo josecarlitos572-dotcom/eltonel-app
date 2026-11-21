@@ -15,7 +15,9 @@ class AuthService extends ChangeNotifier {
     final users = await db.query('personal', where: 'dni = ? AND activo = 1', whereArgs: [dni]);
 
     if (users.isEmpty) return false;
-    final user = users.first;
+
+    // CONVERTIR QueryRow (read-only) a Map mutable
+    final user = Map<String, dynamic>.from(users.first);
     final storedPassword = user['password'] as String? ?? '';
 
     if (storedPassword.isEmpty) return false;
@@ -55,8 +57,11 @@ class AuthService extends ChangeNotifier {
       'requiere_cambio_password': 0,
     }, where: 'id = ?', whereArgs: [_currentUser!['id']]);
 
-    _currentUser!['password'] = newHash;
-    _currentUser!['requiere_cambio_password'] = 0;
+    // REEMPLAZAR el objeto completo con una copia mutable actualizada
+    _currentUser = Map<String, dynamic>.from(_currentUser!)
+      ..['password'] = newHash
+      ..['requiere_cambio_password'] = 0;
+
     notifyListeners();
     return true;
   }
