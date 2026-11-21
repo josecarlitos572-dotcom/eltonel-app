@@ -1,51 +1,64 @@
 import 'package:flutter/foundation.dart';
 import 'database_helper.dart';
+import 'password_service.dart';
 
 class AuthService extends ChangeNotifier {
-  final DatabaseHelper dbHelper;
+  final DatabaseHelper _db;
   Map<String, dynamic>? _currentUser;
 
-  AuthService(this.dbHelper);
+  AuthService(this._db);
 
   Map<String, dynamic>? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
 
   Future<bool> login(String dni, String password) async {
-    final db = await dbHelper.database;
-    
-    // 1. Validar credenciales en la tabla personal
-    var user = await db.query('personal', 
-      where: 'dni = ? AND password = ? AND activo = 1', 
-      whereArgs: [dni, password]); 
-    
-    if (user.isNotEmpty) {
-      Map<String, dynamic> usuario = Map<String, dynamic>.from(user.first);
+    final db = await _db.database;
+    final users = await db.query('personal', where: 'dni = ? AND activo = 1', whereArgs: [dni]);
 
-      // 2. Si es VENDEDOR, buscar su asignación de HOY
-      if (usuario['rol'] == 'VENDEDOR') {
-        final hoy = DateTime.now().toIso8601String().split('T')[0];
-        final asignacion = await db.query('asignaciones_diarias',
-            where: 'usuario_id = ? AND fecha = ? AND estado = ?',
-            whereArgs: [usuario['id'], hoy, 'ACTIVO']);
-        
-        if (asignacion.isNotEmpty) {
-          // Guardamos el PV que el admin le asignó para hoy
-          usuario['punto_venta_id_actual'] = asignacion.first['punto_venta_id'];
-        } else {
-          // Si no tiene asignación hoy, el login_screen lo bloqueará, 
-          // pero le ponemos un 0 para que no explote.
-          usuario['punto_venta_id_actual'] = 0; 
-        }
+    if (users.isEmpty) return false;
+    final user = users.first;
+    final storedPassword = user['password'] as String? ?? '';
+
+    if (storedPassword.isEmpty) return false;
+
+    // Migración transparente: si la contraseña no tiene formato de hash (no contiene ':')
+    if (!storedPassword.contains(':')) {
+      if (storedPassword == password) {
+        final newHash = PasswordService.hashPassword(password);
+        await db.update('personal', {
+          'password': newHash,
+          'requiere_cambio_password': 1,
+        }, where: 'id = ?', whereArgs: [user['id']]);
+        user['password'] = newHash;
+        user['requiere_cambio_password'] = 1;
       } else {
-        // Si es ADMIN, no opera en calle, así que su PV actual es 0
-        usuario['punto_venta_id_actual'] = 0; 
+        return false;
       }
-
-      _currentUser = usuario; 
-      notifyListeners(); 
-      return true; 
+    } else {
+      if (!PasswordService.verifyPassword(password, storedPassword)) {
+        return false;
+      }
     }
-    return false; 
+
+    _currentUser = user;
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> cambiarPassword(String nuevoPassword) async {
+    if (_currentUser == null) return false;
+    if (nuevoPassword.length < 6) return false;
+
+    final db = await _db.database;
+    final newHash = PasswordService.hashPassword(nuevoPassword);
+    await db.update('personal', {
+      'password': newHash,
+      'requiere_cambio_password': 0,
+    }, where: 'id = ?', whereArgs: [_currentUser!['id']]);
+
+    _currentUser!['password'] = newHash;
+    _currentUser!['requiere_cambio_password'] = 0;
+    notifyListeners();
+    return true;
   }
 
   void logout() {
