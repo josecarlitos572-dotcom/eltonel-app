@@ -1,35 +1,23 @@
-// ============================================================
-// main.dart — Entrada de "Desayunos El Tonel"
-// Arranque blindado: nunca deja pantalla blanca.
-// Cualquier error de build se pinta en pantalla como texto.
-// ============================================================
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import 'services/database_helper.dart';
+import 'services/auth_service.dart';
+import 'screens/login_screen.dart';
 
-import 'dart:async';                          // runZonedGuarded + Timer
-import 'package:flutter/material.dart';      // Widgets y tema
-import 'package:flutter/foundation.dart';    // FlutterError / FlutterErrorDetails
-import 'package:provider/provider.dart';     // Inyección de estado
-import 'services/database_helper.dart';      // Capa de base de datos local
-import 'services/auth_service.dart';         // Capa de autenticación
-import 'screens/login_screen.dart';          // Primera pantalla
-
-// Notifier global para errores asíncronos (zona) visibles en pantalla.
 final ValueNotifier<String?> zoneError = ValueNotifier<String?>(null);
 
 void main() {
-  // Zona protegida: captura errores asíncronos no manejados.
   runZonedGuarded<Future<void>>(() async {
-    // Despierta el motor Flutter antes de tocar plugins (sqflite, etc.).
     WidgetsFlutterBinding.ensureInitialized();
 
-    // En release, sustituye el lienzo blanco por un panel de error legible.
     ErrorWidget.builder = (FlutterErrorDetails d) => ErrorPanel(details: d);
 
-    // Registra errores de framework sin romper la UI.
     FlutterError.onError = (FlutterErrorDetails d) {
-      FlutterError.presentError(d);          // Mantiene el reporte estándar
+      FlutterError.presentError(d);
     };
 
-    // Lanza la app con sus providers de estado.
     runApp(
       MultiProvider(
         providers: [
@@ -42,22 +30,20 @@ void main() {
       ),
     );
   }, (Object error, StackTrace stack) {
-    // Publica el error asíncrono para que la UI lo muestre.
     zoneError.value = '$error\n\n$stack';
   });
 }
 
-// Panel de error visible en CUALQUIER modo (debug y release).
 class ErrorPanel extends StatelessWidget {
-  final FlutterErrorDetails details;        // Detalle del fallo de build
+  final FlutterErrorDetails details;
   const ErrorPanel({Key? key, required this.details}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.ltr,     // Necesario fuera de MaterialApp
+      textDirection: TextDirection.ltr,
       child: Material(
-        color: const Color(0xFF121212),     // Fondo oscuro de la marca
+        color: const Color(0xFF121212),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -67,25 +53,25 @@ class ErrorPanel extends StatelessWidget {
                 const Text(
                   'ERROR INTERNO — EL TONEL',
                   style: TextStyle(
-                    color: Color(0xFFFF5252),          // Rojo de peligro
+                    color: Color(0xFFFF5252),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Copia este texto (mantén presionado) y envíalo.',
+                  'Copia este texto y envíalo al soporte.',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
                   child: Scrollbar(
-                    thumbVisibility: true,             // Scroll visible propio
+                    thumbVisibility: true,
                     child: SingleChildScrollView(
                       child: SelectableText(
-                        details.exceptionAsString(),   // Mensaje real del error
+                        details.exceptionAsString(),
                         style: const TextStyle(
-                          color: Color(0xFFFFC107),    // Ámbar de acento
+                          color: Color(0xFFFFC107),
                           fontSize: 13,
                           fontFamily: 'monospace',
                         ),
@@ -102,7 +88,6 @@ class ErrorPanel extends StatelessWidget {
   }
 }
 
-// Raíz visual de la aplicación.
 class ElTonelApp extends StatelessWidget {
   const ElTonelApp({Key? key}) : super(key: key);
 
@@ -120,7 +105,7 @@ class ElTonelApp extends StatelessWidget {
           secondary: Color(0xFFFFC107),
           surface: Color(0xFF1E1E1E),
         ),
-        fontFamily: 'Roboto',                 // Fuente nativa, sin assets
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E1E1E),
           foregroundColor: Colors.white,
@@ -138,9 +123,11 @@ class ElTonelApp extends StatelessWidget {
             backgroundColor: const Color(0xFFFFC107),
             foregroundColor: Colors.black,
             textStyle: const TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Roboto'),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Roboto',
+            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           ),
         ),
@@ -150,29 +137,28 @@ class ElTonelApp extends StatelessWidget {
           labelStyle: const TextStyle(color: Colors.white70, fontFamily: 'Roboto'),
           hintStyle: const TextStyle(color: Colors.white30, fontFamily: 'Roboto'),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2)),
+            borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2),
+          ),
         ),
       ),
-      // Escucha errores de zona y los muestra encima de todo.
       home: ValueListenableBuilder<String?>(
         valueListenable: zoneError,
         builder: (context, err, _) {
           if (err != null) {
-            return ErrorPanel(
-              details: FlutterErrorDetails(exception: err),
-            );
+            return ErrorPanel(details: FlutterErrorDetails(exception: err));
           }
-          return InactivityWrapper(child: LoginScreen());
+          return const InactivityWrapper(child: LoginScreen());
         },
       ),
     );
   }
 }
 
-// Cierra sesión tras 10 minutos sin interacción.
 class InactivityWrapper extends StatefulWidget {
   final Widget child;
   const InactivityWrapper({Key? key, required this.child}) : super(key: key);
@@ -182,23 +168,42 @@ class InactivityWrapper extends StatefulWidget {
 }
 
 class _InactivityWrapperState extends State<InactivityWrapper> {
-  Timer? _timer;                            // Temporizador de inactividad
+  Timer? _timer;
+  int _minutosInactividad = 10;
+  bool _configCargada = false;
 
   @override
   void initState() {
     super.initState();
-    _resetTimer();                          // Arranca el conteo
+    _cargarConfiguracion();
+  }
+
+  Future<void> _cargarConfiguracion() async {
+    try {
+      final db = context.read<DatabaseHelper>();
+      final valor = await db.getParametro('inactividad_minutos');
+      if (valor != null) {
+        final mins = int.tryParse(valor);
+        if (mins != null && mins > 0) {
+          _minutosInactividad = mins;
+        }
+      }
+    } catch (_) {
+      // Si falla, usar el default de 10 minutos
+    }
+    setState(() => _configCargada = true);
+    _resetTimer();
   }
 
   void _resetTimer() {
-    _timer?.cancel();                       // Cancela el anterior
-    _timer = Timer(const Duration(minutes: 10), () {
+    _timer?.cancel();
+    _timer = Timer(Duration(minutes: _minutosInactividad), () {
       if (mounted) {
         final auth = Provider.of<AuthService>(context, listen: false);
-        auth.logout();                      // Limpia sesión
+        auth.logout();
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => LoginScreen()),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       }
     });
@@ -206,16 +211,22 @@ class _InactivityWrapperState extends State<InactivityWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_configCargada) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFFFC107))),
+      );
+    }
     return GestureDetector(
-      onTap: _resetTimer,                   // Cualquier toque reinicia
-      onPanDown: (_) => _resetTimer(),      // Cualquier arrastre reinicia
+      onTap: _resetTimer,
+      onPanDown: (_) => _resetTimer(),
       child: widget.child,
     );
   }
 
   @override
   void dispose() {
-    _timer?.cancel();                       // Libera el temporizador
+    _timer?.cancel();
     super.dispose();
   }
 }
