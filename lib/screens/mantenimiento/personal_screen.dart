@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/database_helper.dart';
-import '../services/password_service.dart';
+import '../../services/database_helper.dart';
+import '../../services/password_service.dart';
 
 class PersonalScreen extends StatefulWidget {
   @override
@@ -33,7 +33,7 @@ class _PersonalScreenState extends State<PersonalScreen> {
     final nomCtrl = TextEditingController(text: usuario?['nombres'] ?? '');
     final apeCtrl = TextEditingController(text: usuario?['apellidos'] ?? '');
     final fonoCtrl = TextEditingController(text: usuario?['fono'] ?? '');
-    final passCtrl = TextEditingController(); // Vacío en edición para no cambiar si no se escribe
+    final passCtrl = TextEditingController();
     String rol = usuario?['rol'] ?? 'VENDEDOR';
     int? pvId = usuario?['punto_venta_id'] as int?;
 
@@ -57,7 +57,7 @@ class _PersonalScreenState extends State<PersonalScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: passCtrl,
-                  obscureText: true, // SIEMPRE OCULTO
+                  obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: esEdicion ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña',
