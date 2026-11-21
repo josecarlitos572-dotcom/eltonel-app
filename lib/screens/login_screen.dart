@@ -1,91 +1,211 @@
-// ============================================================
-// login_screen.dart — Acceso El Tonel (v1.1)
-// Cambio: logo real desde assets con fallback a ícono.
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
-import '../services/database_helper.dart';
-import 'home_screen.dart';
+import 'admin_dashboard_screen.dart';
+import 'venta_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _dniCtrl = TextEditingController();
-  final TextEditingController _passCtrl = TextEditingController();
+  final _dniCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _obscure = true;
   bool _cargando = false;
 
-  String get _hoy => DateTime.now().toIso8601String().split('T')[0];
-  String get _diaSemana {
-    const dias = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
-    return dias[DateTime.now().weekday - 1];
-  }
-  String get _horaActual {
-    final n = DateTime.now();
-    return '${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}';
-  }
-  bool _estaEnHorario(String ini, String fin) => _horaActual.compareTo(ini) >= 0 && _horaActual.compareTo(fin) <= 0;
-
-  void _mostrarDialogo(String titulo, String mensaje, Color colorTitulo) {
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(titulo, style: TextStyle(color: colorTitulo, fontSize: 16)),
-      content: Text(mensaje, style: const TextStyle(color: Colors.white, fontSize: 13)),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('ENTENDIDO', style: TextStyle(color: Color(0xFFFFC107))))],
-    ));
+  @override
+  void dispose() {
+    _dniCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _login() async {
-    if (_dniCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
-      _mostrarDialogo('FALTAN DATOS', 'Ingrese DNI y contraseña', Colors.orange); return;
+    if (_dniCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa DNI y contraseña'), backgroundColor: Colors.red),
+      );
+      return;
     }
+
     setState(() => _cargando = true);
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final db = Provider.of<DatabaseHelper>(context, listen: false);
-    final bool success = await auth.login(_dniCtrl.text.trim(), _passCtrl.text.trim());
-    if (!success) {
-      setState(() => _cargando = false);
-      _mostrarDialogo('ERROR', 'DNI o Contraseña incorrectos', Colors.red); return;
-    }
-    final usuario = auth.currentUser!;
-    final rol = usuario['rol'] as String?;
-    if (rol == 'VENDEDOR') {
-      if (_diaSemana == 'dom') { auth.logout(); setState(() => _cargando = false); _mostrarDialogo('HOY NO HAY LABOR', 'Los domingos el negocio no opera.\n\nVuelve el lunes.', Colors.orange); return; }
-      if (!_estaEnHorario('03:00', '11:00')) { auth.logout(); setState(() => _cargando = false); _mostrarDialogo('FUERA DE HORARIO', 'El horario es de 03:00 a 11:00.\n\nHora actual: $_horaActual', Colors.red); return; }
-      final asignaciones = await db.consultar('asignaciones_diarias', where: 'usuario_id = ? AND fecha = ? AND estado = ?', whereArgs: [usuario['id'], _hoy, 'ACTIVO']);
-      if (asignaciones.isEmpty) { auth.logout(); setState(() => _cargando = false); _mostrarDialogo('SIN ASIGNACIÓN', 'No estás asignado para hoy.\n\nContacta al administrador.', Colors.red); return; }
-    }
+    final auth = context.read<AuthService>();
+    final success = await auth.login(_dniCtrl.text.trim(), _passCtrl.text);
     setState(() => _cargando = false);
-    if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
+
+    if (!mounted) return;
+
+    if (success) {
+      if (auth.currentUser?['requiere_cambio_password'] == 1) {
+        _mostrarDialogoCambioClave(auth);
+      } else {
+        _navegarSegunRol(auth);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('DNI o contraseña incorrectos'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _mostrarDialogoCambioClave(AuthService auth) {
+    final nuevaCtrl = TextEditingController();
+    final confirmarCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          'CAMBIO DE CONTRASEÑA OBLIGATORIO',
+          style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Por seguridad debes cambiar tu contraseña antes de continuar.',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nuevaCtrl,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Nueva contraseña (mín. 6 caracteres)',
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmarCtrl,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Confirmar contraseña',
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (nuevaCtrl.text.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Mínimo 6 caracteres'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              if (nuevaCtrl.text != confirmarCtrl.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Las contraseñas no coinciden'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              final ok = await auth.cambiarPassword(nuevaCtrl.text);
+              if (ok && mounted) {
+                Navigator.pop(ctx);
+                _navegarSegunRol(auth);
+              }
+            },
+            child: const Text('GUARDAR', style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navegarSegunRol(AuthService auth) {
+    final rol = auth.currentUser?['rol'] ?? '';
+    if (rol == 'ADMIN') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const VentaScreen()));
+    }
   }
 
   @override
-  void dispose() { _dniCtrl.dispose(); _passCtrl.dispose(); super.dispose(); }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(body: Container(
-      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2A0E0E), Color(0xFF121212)])),
-      child: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(28), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: const Color(0xFF1E1E1E), shape: BoxShape.circle, border: Border.all(color: const Color(0xFFFFC107), width: 3), boxShadow: const [BoxShadow(color: Color(0x66FFC107), blurRadius: 24, spreadRadius: 2)]),
-          // ✅ Logo real del repositorio (assets/logo/eltonel_logo.png)
-          child: Image.asset('assets/logo/eltonel_logo.png', width: 64, height: 64, errorBuilder: (_, __, ___) => const Icon(Icons.breakfast_dining, size: 64, color: Color(0xFFFFC107)))),
-        const SizedBox(height: 22),
-        const Text('DESAYUNOS EL TONEL', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.2), textAlign: TextAlign.center),
-        const SizedBox(height: 6),
-        const Text('Sistema de Gestión · v1.1', style: TextStyle(color: Colors.white54, fontSize: 12)),
-        const SizedBox(height: 44),
-        TextField(controller: _dniCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'DNI')),
-        const SizedBox(height: 18),
-        TextField(controller: _passCtrl, obscureText: true, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'CONTRASEÑA')),
-        const SizedBox(height: 36),
-        _cargando ? const CircularProgressIndicator(color: Color(0xFFFFC107)) : SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _login, child: const Text('INGRESAR'))),
-      ]))))));
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'EL TONEL',
+                style: TextStyle(
+                  color: Colors.yellow,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Desayunos',
+                style: TextStyle(color: Colors.white54, fontSize: 14),
+              ),
+              const SizedBox(height: 40),
+              TextField(
+                controller: _dniCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'DNI',
+                  prefixIcon: Icon(Icons.person, color: Colors.yellow),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.yellow)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passCtrl,
+                obscureText: _obscure,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  prefixIcon: const Icon(Icons.lock, color: Colors.yellow),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off, color: Colors.white70),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                  enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+                  focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.yellow)),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _cargando ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: _cargando
+                      ? const CircularProgressIndicator(color: Colors.black)
+                      : const Text('INGRESAR', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
