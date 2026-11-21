@@ -74,6 +74,7 @@ class _PersonalScreenState extends State<PersonalScreen> {
                   items: const [
                     DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN', style: TextStyle(color: Colors.white))),
                     DropdownMenuItem(value: 'VENDEDOR', child: Text('VENDEDOR', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'VENDEDOR_BETA', child: Text('VENDEDOR BETA (sin horario)', style: TextStyle(color: Colors.orange))),
                     DropdownMenuItem(value: 'CAJERO', child: Text('CAJERO', style: TextStyle(color: Colors.white))),
                   ],
                   onChanged: (v) => setD(() => rol = v ?? 'VENDEDOR'),
@@ -126,7 +127,7 @@ class _PersonalScreenState extends State<PersonalScreen> {
                 } else {
                   await db.insertar('personal', data);
                 }
-                
+
                 Navigator.pop(ctx);
                 _cargar();
               },
@@ -159,13 +160,14 @@ class _PersonalScreenState extends State<PersonalScreen> {
         itemCount: _personal.length,
         itemBuilder: (_, i) {
           final u = _personal[i];
+          final esBeta = (u['rol'] ?? '') == 'VENDEDOR_BETA';
           return Card(
             color: const Color(0xFF1A1A1A),
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: ListTile(
-              leading: CircleAvatar(backgroundColor: Colors.yellow, child: Text(u['dni'].toString().substring(0, 2), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
+              leading: CircleAvatar(backgroundColor: esBeta ? Colors.orange : Colors.yellow, child: Text(u['dni'].toString().substring(0, 2), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
               title: Text('${u['nombres']} ${u['apellidos']}', style: const TextStyle(color: Colors.white)),
-              subtitle: Text('${u['rol']} - PV: ${u['punto_venta_id'] ?? 'Ninguno'}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              subtitle: Text('${u['rol']} - PV: ${u['punto_venta_id'] ?? 'Ninguno'}', style: TextStyle(color: esBeta ? Colors.orange : Colors.white54, fontSize: 12)),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
