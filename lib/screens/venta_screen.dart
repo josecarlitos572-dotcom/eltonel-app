@@ -109,10 +109,12 @@ class _VentaScreenState extends State<VentaScreen> {
     _aviso('Carrito vaciado', _red, accion: 'DESHACER', onAccion: () => setState(() => _cart.addAll(copia)));
   }
 
+  // FILTRO: solo muestra productos con stock positivo
   List<Map<String, dynamic>> get _visibles {
     final q = _query.trim().toLowerCase();
     return _productos.where((p) {
       if (_catId != null && p['categoria_id'] != _catId) return false;
+      if ((_stock[p['id']] ?? 0) <= 0) return false; // OCULTA SIN STOCK
       if (q.isEmpty) return true;
       return '${p['codigo']} ${p['nombre']}'.toLowerCase().contains(q);
     }).toList();
@@ -250,51 +252,12 @@ class _VentaScreenState extends State<VentaScreen> {
 
   Widget _pay(String label, IconData icon, List<Color> grad, VoidCallback onTap) {
     final enabled = _cart.isNotEmpty && !_procesando;
-    return Opacity(
-      opacity: enabled ? 1 : .4,
-      child: Material(
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: enabled ? onTap : null,
-          child: Ink(
-            height: 52,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: grad,
-              ),
-            ),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(icon, color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: .3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return Opacity(opacity: enabled ? 1 : .4, child: Material(borderRadius: BorderRadius.circular(12), child: InkWell(borderRadius: BorderRadius.circular(12), onTap: enabled ? onTap : null,
+      child: Ink(height: 52, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: grad)),
+        child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6),
+          Text(label, maxLines: 1, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: .3)),
+        ])))))));
   }
 
   @override
@@ -328,7 +291,7 @@ class _VentaScreenState extends State<VentaScreen> {
         ..._categorias.map((c) => _chip(c['abreviatura'] ?? c['nombre'] ?? '', c['id'] as int)),
       ])),
       Expanded(child: _visibles.isEmpty
-        ? const Center(child: Text('Sin productos en esta categoría', style: TextStyle(color: Colors.white38)))
+        ? const Center(child: Text('Sin productos con stock en esta categoría', style: TextStyle(color: Colors.white38)))
         : GridView.builder(padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: .92),
             itemCount: _visibles.length,
