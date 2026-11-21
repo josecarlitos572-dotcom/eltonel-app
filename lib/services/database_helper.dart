@@ -5,7 +5,7 @@ import 'password_service.dart';
 
 class DatabaseHelper extends ChangeNotifier {
   static Database? _database;
-  static const String dbName = 'eltonel_v14.db'; // MANTENER NOMBRE ORIGINAL PARA NO PERDER DATOS
+  static const String dbName = 'eltonel_v14.db';
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -18,7 +18,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), dbName);
     return await openDatabase(
       path,
-      version: 15, // VERSIÓN ACTUALIZADA A 15
+      version: 15,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -54,8 +54,6 @@ class DatabaseHelper extends ChangeNotifier {
     if (oldVersion < 15) {
       try {
         await db.execute('ALTER TABLE personal ADD COLUMN requiere_cambio_password INTEGER DEFAULT 1');
-        
-        // Hashear contraseñas existentes en texto plano
         final users = await db.query('personal');
         for (var user in users) {
           final password = user['password'] as String? ?? '';
@@ -85,7 +83,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('categorias_gasto', {'nombre': 'Rellenos Panes', 'limite_max': 12});
     await db.insert('categorias_gasto', {'nombre': 'Desayuno', 'limite_max': 6});
 
-    final adminHash = PasswordService.hashPassword('JOse$$11');
+    final adminHash = PasswordService.hashPassword('JOse\$\$11');
     await db.insert('personal', {
       'apellidos': 'ADMIN', 'nombres': 'PRINCIPAL', 'dni': '09878372',
       'rol': 'ADMIN', 'password': adminHash, 'punto_venta_id': 1, 'requiere_cambio_password': 1
