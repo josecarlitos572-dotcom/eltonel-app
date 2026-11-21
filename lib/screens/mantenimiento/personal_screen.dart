@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/database_helper.dart';
+import '../services/database_helper.dart';
+import '../services/password_service.dart';
 
 class PersonalScreen extends StatefulWidget {
   @override
@@ -11,294 +12,170 @@ class _PersonalScreenState extends State<PersonalScreen> {
   List<Map<String, dynamic>> _personal = [];
   List<Map<String, dynamic>> _puntos = [];
   bool _cargando = true;
-  String _busqueda = '';
 
   @override
   void initState() {
     super.initState();
-    _cargarTodo();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _cargar());
   }
 
-  Future<void> _cargarTodo() async {
+  Future<void> _cargar() async {
     setState(() => _cargando = true);
-    final db = Provider.of<DatabaseHelper>(context, listen: false);
-    final personal = await db.consultar('personal', orderBy: 'apellidos ASC');
-    final puntos = await db.getPuntosVenta();
-    setState(() {
-      _personal = personal;
-      _puntos = puntos;
-      _cargando = false;
-    });
+    final db = context.read<DatabaseHelper>();
+    _personal = await db.consultar('personal', orderBy: 'id ASC');
+    _puntos = await db.getPuntosVenta();
+    if (mounted) setState(() => _cargando = false);
   }
 
-  List<Map<String, dynamic>> get _filtrados {
-    if (_busqueda.isEmpty) return _personal;
-    final q = _busqueda.toLowerCase();
-    return _personal.where((p) {
-      final ape = (p['apellidos'] ?? '').toString().toLowerCase();
-      final nom = (p['nombres'] ?? '').toString().toLowerCase();
-      final dni = (p['dni'] ?? '').toString().toLowerCase();
-      final rol = (p['rol'] ?? '').toString().toLowerCase();
-      return ape.contains(q) || nom.contains(q) || dni.contains(q) || rol.contains(q);
-    }).toList();
-  }
+  void _mostrarFormulario({Map<String, dynamic>? usuario}) {
+    final esEdicion = usuario != null;
+    final dniCtrl = TextEditingController(text: usuario?['dni'] ?? '');
+    final nomCtrl = TextEditingController(text: usuario?['nombres'] ?? '');
+    final apeCtrl = TextEditingController(text: usuario?['apellidos'] ?? '');
+    final fonoCtrl = TextEditingController(text: usuario?['fono'] ?? '');
+    final passCtrl = TextEditingController(); // Vacío en edición para no cambiar si no se escribe
+    String rol = usuario?['rol'] ?? 'VENDEDOR';
+    int? pvId = usuario?['punto_venta_id'] as int?;
 
-  Future<void> _eliminar(int id, String nombre) async {
-    final conf = await showDialog<bool>(
+    showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: Text('¿Desactivar?',
-            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew')),
-        content: Text('Se desactivará "$nombre"',
-            style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('NO', style: TextStyle(color: Colors.white))),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('SÍ', style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    );
-    if (conf == true) {
-      final db = Provider.of<DatabaseHelper>(context, listen: false);
-      await db.actualizar('personal', {'id': id, 'activo': 0});
-      _cargarTodo();
-    }
-  }
-
-  Future<void> _abrirFormulario({Map<String, dynamic>? persona}) async {
-    final apellidosCtrl = TextEditingController(text: persona?['apellidos'] ?? '');
-    final nombresCtrl = TextEditingController(text: persona?['nombres'] ?? '');
-    final dniCtrl = TextEditingController(text: persona?['dni'] ?? '');
-    final fonoCtrl = TextEditingController(text: persona?['fono'] ?? '');
-    final passCtrl = TextEditingController(text: persona?['password'] ?? '');
-    String rolSeleccionado = persona?['rol'] ?? 'VENDEDOR';
-    int? puntoSeleccionado = persona?['punto_venta_id'] as int?;
-    if (puntoSeleccionado == null && _puntos.isNotEmpty) {
-      puntoSeleccionado = _puntos.first['id'] as int;
-    }
-    final esEdicion = persona != null;
-
-    if (!mounted) return;
-
-    final guardar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: Text(
-          esEdicion ? 'EDITAR PERSONA' : 'NUEVA PERSONA',
-          style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 16),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: apellidosCtrl,
-                decoration: InputDecoration(labelText: 'Apellidos'),
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: nombresCtrl,
-                decoration: InputDecoration(labelText: 'Nombres'),
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: dniCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: 'DNI (8 dígitos)'),
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: fonoCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(labelText: 'Teléfono'),
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: passCtrl,
-                decoration: InputDecoration(labelText: 'Contraseña'),
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-              ),
-              SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: rolSeleccionado,
-                dropdownColor: Colors.black,
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'Rol'),
-                items: [
-                  DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 'VENDEDOR', child: Text('VENDEDOR', style: TextStyle(color: Colors.white))),
-                ],
-                onChanged: (v) => rolSeleccionado = v ?? 'VENDEDOR',
-              ),
-              SizedBox(height: 10),
-              DropdownButtonFormField<int>(
-                value: puntoSeleccionado,
-                dropdownColor: Colors.black,
-                style: TextStyle(color: Colors.white, fontFamily: 'CourierNew'),
-                decoration: InputDecoration(labelText: 'Punto de venta'),
-                items: _puntos.map<DropdownMenuItem<int>>((p) {
-                  return DropdownMenuItem<int>(
-                    value: p['id'] as int,
-                    child: Text(
-                      '${p['codigo']} - ${p['nombre']}',
-                      style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (v) => puntoSeleccionado = v,
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setD) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: Text(esEdicion ? 'EDITAR USUARIO' : 'NUEVO USUARIO', style: const TextStyle(color: Colors.yellow)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: dniCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'DNI', labelStyle: TextStyle(color: Colors.white70), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)))),
+                const SizedBox(height: 8),
+                TextField(controller: nomCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Nombres', labelStyle: TextStyle(color: Colors.white70), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)))),
+                const SizedBox(height: 8),
+                TextField(controller: apeCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Apellidos', labelStyle: TextStyle(color: Colors.white70), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)))),
+                const SizedBox(height: 8),
+                TextField(controller: fonoCtrl, keyboardType: TextInputType.phone, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Teléfono', labelStyle: TextStyle(color: Colors.white70), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)))),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true, // SIEMPRE OCULTO
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: esEdicion ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña',
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: rol,
+                  dropdownColor: Colors.black,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(labelText: 'Rol', labelStyle: TextStyle(color: Colors.white70)),
+                  items: const [
+                    DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'VENDEDOR', child: Text('VENDEDOR', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'CAJERO', child: Text('CAJERO', style: TextStyle(color: Colors.white))),
+                  ],
+                  onChanged: (v) => setD(() => rol = v ?? 'VENDEDOR'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: pvId,
+                  dropdownColor: Colors.black,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(labelText: 'Punto de Venta', labelStyle: TextStyle(color: Colors.white70)),
+                  items: _puntos.map<DropdownMenuItem<int>>((p) => DropdownMenuItem<int>(value: p['id'] as int, child: Text('${p['codigo']} - ${p['nombre']}', style: const TextStyle(color: Colors.white)))).toList(),
+                  onChanged: (v) => setD(() => pvId = v),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCELAR', style: TextStyle(color: Colors.white54))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black),
+              onPressed: () async {
+                if (dniCtrl.text.isEmpty || nomCtrl.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('DNI y Nombres son obligatorios'), backgroundColor: Colors.red));
+                  return;
+                }
+                if (!esEdicion && passCtrl.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La contraseña es obligatoria para nuevos usuarios'), backgroundColor: Colors.red));
+                  return;
+                }
+
+                final db = context.read<DatabaseHelper>();
+                final data = {
+                  'dni': dniCtrl.text.trim(),
+                  'nombres': nomCtrl.text.trim(),
+                  'apellidos': apeCtrl.text.trim(),
+                  'fono': fonoCtrl.text.trim(),
+                  'rol': rol,
+                  'punto_venta_id': pvId,
+                  'activo': 1,
+                };
+
+                if (passCtrl.text.isNotEmpty) {
+                  data['password'] = PasswordService.hashPassword(passCtrl.text);
+                  data['requiere_cambio_password'] = 1;
+                }
+
+                if (esEdicion) {
+                  data['id'] = usuario!['id'];
+                  await db.actualizar('personal', data);
+                } else {
+                  await db.insertar('personal', data);
+                }
+                
+                Navigator.pop(ctx);
+                _cargar();
+              },
+              child: const Text('GUARDAR'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('CANCELAR', style: TextStyle(color: Colors.white))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('GUARDAR', style: TextStyle(color: Colors.yellow))),
-        ],
       ),
     );
-
-    if (guardar == true) {
-      if (apellidosCtrl.text.trim().isEmpty || nombresCtrl.text.trim().isEmpty || dniCtrl.text.trim().isEmpty || passCtrl.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Complete apellidos, nombres, DNI y contraseña'), backgroundColor: Colors.red),
-        );
-        return;
-      }
-      final db = Provider.of<DatabaseHelper>(context, listen: false);
-      final data = {
-        'apellidos': apellidosCtrl.text.trim(),
-        'nombres': nombresCtrl.text.trim(),
-        'dni': dniCtrl.text.trim(),
-        'fono': fonoCtrl.text.trim(),
-        'rol': rolSeleccionado,
-        'password': passCtrl.text.trim(),
-        'punto_venta_id': puntoSeleccionado,
-        'activo': 1,
-      };
-      try {
-        if (esEdicion) {
-          data['id'] = persona['id'];
-          await db.actualizar('personal', data);
-        } else {
-          await db.insertar('personal', data);
-        }
-        _cargarTodo();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
   }
 
-  String _nombrePunto(int? id) {
-    if (id == null || id == 0) return 'BASE';
-    final punto = _puntos.where((p) => p['id'] == id).toList();
-    if (punto.isEmpty) return 'BASE';
-    return punto.first['codigo'] ?? '?';
+  Future<void> _eliminar(int id) async {
+    final db = context.read<DatabaseHelper>();
+    await db.eliminar('personal', id);
+    _cargar();
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtrados = _filtrados;
+    if (_cargando) return const Scaffold(backgroundColor: Colors.black, body: Center(child: CircularProgressIndicator(color: Colors.yellow)));
     return Scaffold(
-      appBar: AppBar(
-        title: Text('PERSONAL (${filtrados.length})'),
-        actions: [
-          IconButton(icon: Icon(Icons.refresh), onPressed: _cargarTodo),
-        ],
-      ),
+      appBar: AppBar(title: const Text('GESTIÓN DE PERSONAL'), backgroundColor: Colors.black),
       backgroundColor: Colors.black,
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.yellow,
-        onPressed: () => _abrirFormulario(),
-        child: Icon(Icons.add, color: Colors.black),
+        onPressed: () => _mostrarFormulario(),
+        child: const Icon(Icons.add, color: Colors.black),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(10),
-            child: TextField(
-              onChanged: (v) => setState(() => _busqueda = v),
-              decoration: InputDecoration(
-                hintText: 'Buscar por nombre, DNI o rol...',
-                hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
-                prefixIcon: Icon(Icons.search, color: Colors.yellow),
-                filled: true,
-                fillColor: Color(0xFF1A1A1A),
-                border: OutlineInputBorder(),
+      body: ListView.builder(
+        itemCount: _personal.length,
+        itemBuilder: (_, i) {
+          final u = _personal[i];
+          return Card(
+            color: const Color(0xFF1A1A1A),
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: ListTile(
+              leading: CircleAvatar(backgroundColor: Colors.yellow, child: Text(u['dni'].toString().substring(0, 2), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
+              title: Text('${u['nombres']} ${u['apellidos']}', style: const TextStyle(color: Colors.white)),
+              subtitle: Text('${u['rol']} - PV: ${u['punto_venta_id'] ?? 'Ninguno'}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _mostrarFormulario(usuario: u)),
+                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _eliminar(u['id'] as int)),
+                ],
               ),
-              style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 13),
             ),
-          ),
-          Expanded(
-            child: _cargando
-                ? Center(child: CircularProgressIndicator(color: Colors.yellow))
-                : filtrados.isEmpty
-                    ? Center(
-                        child: Text('Sin personal',
-                            style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew')),
-                      )
-                    : ListView.builder(
-                        itemCount: filtrados.length,
-                        itemBuilder: (context, i) {
-                          final p = filtrados[i];
-                          final activo = (p['activo'] ?? 1) == 1;
-                          final esAdmin = p['rol'] == 'ADMIN';
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: activo
-                                  ? (esAdmin ? Colors.orange : Colors.yellow)
-                                  : Colors.grey,
-                              child: Icon(
-                                esAdmin ? Icons.shield : Icons.person,
-                                color: Colors.black,
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(
-                              '${p['apellidos'] ?? ''}, ${p['nombres'] ?? ''}',
-                              style: TextStyle(
-                                color: activo ? Colors.white : Colors.white38,
-                                fontFamily: 'CourierNew',
-                                fontSize: 13,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'DNI: ${p['dni'] ?? ''} · ${p['rol'] ?? ''} · ${_nombrePunto(p['punto_venta_id'] as int?)}',
-                              style: TextStyle(color: Colors.white54, fontFamily: 'CourierNew', fontSize: 11),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.edit, color: Colors.yellow, size: 20),
-                                  onPressed: () => _abrirFormulario(persona: p),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red, size: 20),
-                                  onPressed: () => _eliminar(p['id'] as int, '${p['apellidos']}, ${p['nombres']}'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
