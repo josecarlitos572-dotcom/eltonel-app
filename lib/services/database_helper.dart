@@ -1,12 +1,11 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
+import 'password_service.dart';
 
 class DatabaseHelper extends ChangeNotifier {
   static Database? _database;
-  List<Map<String, dynamic>> _cachedProducts = [];
-
-  static const String dbName = 'eltonel_v14.db'; // NUEVO NOMBRE PARA FORZAR CREACIÓN LIMPIA
+  static const String dbName = 'eltonel_v14.db'; // MANTENER NOMBRE ORIGINAL PARA NO PERDER DATOS
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -19,7 +18,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), dbName);
     return await openDatabase(
       path,
-      version: 14,
+      version: 15, // VERSIÓN ACTUALIZADA A 15
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -31,29 +30,10 @@ class DatabaseHelper extends ChangeNotifier {
     await db.execute('''CREATE TABLE categorias_gasto (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL, limite_max REAL DEFAULT 9999, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT UNIQUE, nombre TEXT, categoria_id INTEGER, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE precios (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_id INTEGER, punto_venta_id INTEGER, precio REAL)''');
-    await db.execute('''CREATE TABLE personal (id INTEGER PRIMARY KEY AUTOINCREMENT, apellidos TEXT, nombres TEXT, dni TEXT UNIQUE, fono TEXT, rol TEXT, password TEXT, punto_venta_id INTEGER, activo INTEGER DEFAULT 1)''');
+    await db.execute('''CREATE TABLE personal (id INTEGER PRIMARY KEY AUTOINCREMENT, apellidos TEXT, nombres TEXT, dni TEXT UNIQUE, fono TEXT, rol TEXT, password TEXT, punto_venta_id INTEGER, activo INTEGER DEFAULT 1, requiere_cambio_password INTEGER DEFAULT 0)''');
     await db.execute('''CREATE TABLE clientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, dni TEXT, fono TEXT, direccion TEXT, activo INTEGER DEFAULT 1)''');
     await db.execute('''CREATE TABLE inventario (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_id INTEGER, punto_venta_id INTEGER, stock INTEGER, fecha TEXT)''');
-    
-    await db.execute('''CREATE TABLE ventas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, 
-      cliente_id INTEGER, 
-      usuario_id INTEGER, 
-      punto_venta_id INTEGER, 
-      fecha TEXT, 
-      tipo_venta TEXT, 
-      monto_total REAL, 
-      vuelto REAL, 
-      tiene_comprobante INTEGER DEFAULT 0, 
-      nombre_cliente TEXT, 
-      telefono_cliente TEXT, 
-      dni_cliente TEXT, 
-      base_imponible REAL DEFAULT 0,
-      igv REAL DEFAULT 0,
-      estado_comanda TEXT DEFAULT 'PENDIENTE',
-      fecha_vencimiento TEXT
-    )''');
-
+    await db.execute('''CREATE TABLE ventas (id INTEGER PRIMARY KEY AUTOINCREMENT, cliente_id INTEGER, usuario_id INTEGER, punto_venta_id INTEGER, fecha TEXT, tipo_venta TEXT, monto_total REAL, vuelto REAL, tiene_comprobante INTEGER DEFAULT 0, nombre_cliente TEXT, telefono_cliente TEXT, dni_cliente TEXT, base_imponible REAL DEFAULT 0, igv REAL DEFAULT 0, estado_comanda TEXT DEFAULT 'PENDIENTE', fecha_vencimiento TEXT)''');
     await db.execute('''CREATE TABLE detalle_venta (id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER, producto_id INTEGER, cantidad INTEGER, precio_unitario REAL, subtotal REAL)''');
     await db.execute('''CREATE TABLE gastos_internos (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, categoria TEXT NOT NULL, descripcion TEXT, monto REAL NOT NULL, tiene_comprobante INTEGER DEFAULT 0, usuario_id INTEGER)''');
     await db.execute('''CREATE TABLE cierres_caja (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, punto_venta_id INTEGER, personal_id INTEGER, saldo_inicial REAL DEFAULT 0, total_ventas REAL DEFAULT 0, total_gastos_manuales REAL DEFAULT 0, saldo_teorico REAL DEFAULT 0, saldo_real_contado REAL DEFAULT 0, diferencia REAL DEFAULT 0, observaciones TEXT)''');
@@ -71,7 +51,23 @@ class DatabaseHelper extends ChangeNotifier {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Al cambiar de nombre a v14, la creación es limpia. Si tuvieras v13, aquí harías ALTER.
+    if (oldVersion < 15) {
+      try {
+        await db.execute('ALTER TABLE personal ADD COLUMN requiere_cambio_password INTEGER DEFAULT 1');
+        
+        // Hashear contraseñas existentes en texto plano
+        final users = await db.query('personal');
+        for (var user in users) {
+          final password = user['password'] as String? ?? '';
+          if (password.isNotEmpty && !password.contains(':')) {
+            final hash = PasswordService.hashPassword(password);
+            await db.update('personal', {'password': hash}, where: 'id = ?', whereArgs: [user['id']]);
+          }
+        }
+      } catch (e) {
+        // La columna ya existe
+      }
+    }
   }
 
   Future<void> _seedSystem(Database db) async {
@@ -89,9 +85,10 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('categorias_gasto', {'nombre': 'Rellenos Panes', 'limite_max': 12});
     await db.insert('categorias_gasto', {'nombre': 'Desayuno', 'limite_max': 6});
 
+    final adminHash = PasswordService.hashPassword('JOse$$11');
     await db.insert('personal', {
       'apellidos': 'ADMIN', 'nombres': 'PRINCIPAL', 'dni': '09878372',
-      'rol': 'ADMIN', 'password': 'JOse\$\$11', 'punto_venta_id': 0
+      'rol': 'ADMIN', 'password': adminHash, 'punto_venta_id': 1, 'requiere_cambio_password': 1
     });
 
     await _seedProductosYCategorias(db);
@@ -108,7 +105,7 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'admin_whatsapp', 'valor': '51999999999', 'descripcion': 'WhatsApp del admin'},
       {'clave': 'hora_cierre', 'valor': '11:00', 'descripcion': 'Hora sugerida de cierre'},
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
-      {'clave': 'version_bd', 'valor': '14', 'descripcion': 'Versión actual de la BD'},
+      {'clave': 'version_bd', 'valor': '15', 'descripcion': 'Versión actual de la BD'},
     ];
     for (var p in params) {
       await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -125,9 +122,7 @@ class DatabaseHelper extends ChangeNotifier {
       {'nombre': 'Huevos Sancochados', 'abreviatura': 'HUE', 'orden': 6},
       {'nombre': 'Comidas', 'abreviatura': 'COM', 'orden': 7},
     ];
-    for (var cat in categorias) {
-      await db.insert('categorias_producto', cat);
-    }
+    for (var cat in categorias) await db.insert('categorias_producto', cat);
 
     final productos = [
       {'codigo': 'A01', 'nombre': 'Pollo Deshilachado', 'cat': 1, 'precio': 2.0},
@@ -192,17 +187,9 @@ class DatabaseHelper extends ChangeNotifier {
     ];
 
     for (var p in productos) {
-      int prodId = await db.insert('productos', {
-        'codigo': p['codigo'],
-        'nombre': p['nombre'],
-        'categoria_id': p['cat'],
-      });
-      for (int pvId in [2, 3, 4]) {
-        await db.insert('precios', {
-          'producto_id': prodId,
-          'punto_venta_id': pvId,
-          'precio': p['precio'],
-        });
+      int prodId = await db.insert('productos', {'codigo': p['codigo'], 'nombre': p['nombre'], 'categoria_id': p['cat']});
+      for (int pvId in [1, 2, 3, 4]) {
+        await db.insert('precios', {'producto_id': prodId, 'punto_venta_id': pvId, 'precio': p['precio']});
       }
     }
   }
@@ -210,15 +197,8 @@ class DatabaseHelper extends ChangeNotifier {
   Future<int> registrarClienteSiNoExiste(String nombre, String fono, String dni) async {
     final db = await database;
     final existe = await db.query('clientes', where: 'dni = ? OR fono = ?', whereArgs: [dni, fono]);
-    if (existe.isNotEmpty) {
-      return existe.first['id'] as int;
-    }
-    return await db.insert('clientes', {
-      'nombre': nombre,
-      'fono': fono,
-      'dni': dni,
-      'activo': 1,
-    });
+    if (existe.isNotEmpty) return existe.first['id'] as int;
+    return await db.insert('clientes', {'nombre': nombre, 'fono': fono, 'dni': dni, 'activo': 1});
   }
 
   Future<int> insertar(String tabla, Map<String, dynamic> data) async {
@@ -237,12 +217,7 @@ class DatabaseHelper extends ChangeNotifier {
     return await db.delete(tabla, where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<List<Map<String, dynamic>>> consultar(
-    String tabla, {
-    String? where,
-    List<Object?>? whereArgs,
-    String? orderBy,
-  }) async {
+  Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async {
     final db = await database;
     return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
@@ -254,12 +229,7 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> getProductos() async {
     final db = await database;
-    return await db.rawQuery('''
-      SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev
-      FROM productos p
-      LEFT JOIN categorias_producto c ON p.categoria_id = c.id
-      ORDER BY p.codigo ASC
-    ''');
+    return await db.rawQuery('SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev FROM productos p LEFT JOIN categorias_producto c ON p.categoria_id = c.id ORDER BY p.codigo ASC');
   }
 
   Future<List<Map<String, dynamic>>> getCategoriasProducto() async {
@@ -279,72 +249,37 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> getProductoPorId(int id) async {
     final db = await database;
-    final r = await db.rawQuery('''
-      SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev
-      FROM productos p
-      LEFT JOIN categorias_producto c ON p.categoria_id = c.id
-      WHERE p.id = ?
-    ''', [id]);
+    final r = await db.rawQuery('SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev FROM productos p LEFT JOIN categorias_producto c ON p.categoria_id = c.id WHERE p.id = ?', [id]);
     if (r.isEmpty) return null;
     return r.first;
   }
 
   Future<List<Map<String, dynamic>>> getPreciosDeProducto(int productoId) async {
     final db = await database;
-    return await db.rawQuery('''
-      SELECT pr.*, pv.nombre as punto_nombre, pv.codigo as punto_codigo
-      FROM precios pr
-      LEFT JOIN puntos_venta pv ON pr.punto_venta_id = pv.id
-      WHERE pr.producto_id = ?
-      ORDER BY pr.punto_venta_id ASC
-    ''', [productoId]);
+    return await db.rawQuery('SELECT pr.*, pv.nombre as punto_nombre, pv.codigo as punto_codigo FROM precios pr LEFT JOIN puntos_venta pv ON pr.punto_venta_id = pv.id WHERE pr.producto_id = ? ORDER BY pr.punto_venta_id ASC', [productoId]);
   }
 
-  Future<int> insertarProductoConPrecios({
-    required String codigo,
-    required String nombre,
-    required int categoriaId,
-    required Map<int, double> precios,
-  }) async {
+  Future<int> insertarProductoConPrecios({required String codigo, required String nombre, required int categoriaId, required Map<int, double> precios}) async {
     final db = await database;
     return await db.transaction((txn) async {
-      int prodId = await txn.insert('productos', {
-        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId, 'activo': 1,
-      });
+      int prodId = await txn.insert('productos', {'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId, 'activo': 1});
       for (var entry in precios.entries) {
-        await txn.insert('precios', {
-          'producto_id': prodId, 'punto_venta_id': entry.key, 'precio': entry.value,
-        });
+        await txn.insert('precios', {'producto_id': prodId, 'punto_venta_id': entry.key, 'precio': entry.value});
       }
       return prodId;
     });
   }
 
-  Future<void> actualizarProductoConPrecios({
-    required int productoId,
-    required String codigo,
-    required String nombre,
-    required int categoriaId,
-    required Map<int, double> precios,
-  }) async {
+  Future<void> actualizarProductoConPrecios({required int productoId, required String codigo, required String nombre, required int categoriaId, required Map<int, double> precios}) async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.update('productos', {
-        'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId,
-      }, where: 'id = ?', whereArgs: [productoId]);
-
+      await txn.update('productos', {'codigo': codigo, 'nombre': nombre, 'categoria_id': categoriaId}, where: 'id = ?', whereArgs: [productoId]);
       for (var entry in precios.entries) {
-        final existe = await txn.query('precios',
-            where: 'producto_id = ? AND punto_venta_id = ?',
-            whereArgs: [productoId, entry.key]);
+        final existe = await txn.query('precios', where: 'producto_id = ? AND punto_venta_id = ?', whereArgs: [productoId, entry.key]);
         if (existe.isEmpty) {
-          await txn.insert('precios', {
-            'producto_id': productoId, 'punto_venta_id': entry.key, 'precio': entry.value,
-          });
+          await txn.insert('precios', {'producto_id': productoId, 'punto_venta_id': entry.key, 'precio': entry.value});
         } else {
-          await txn.update('precios', {'precio': entry.value},
-              where: 'producto_id = ? AND punto_venta_id = ?',
-              whereArgs: [productoId, entry.key]);
+          await txn.update('precios', {'precio': entry.value}, where: 'producto_id = ? AND punto_venta_id = ?', whereArgs: [productoId, entry.key]);
         }
       }
     });
@@ -369,75 +304,39 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<void> setParametro(String clave, String valor) async {
     final db = await database;
-    await db.insert('parametros', {'clave': clave, 'valor': valor},
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('parametros', {'clave': clave, 'valor': valor}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> _loadCache() async {
     final db = await database;
-    _cachedProducts = await db.query('productos', where: 'activo = 1');
     notifyListeners();
   }
 
-  List<Map<String, dynamic>> get products => _cachedProducts;
-
   Future<void> registrarVenta(Map<String, dynamic> ventaData, List<Map<String, dynamic>> items, {bool esCredito = false}) async {
     final db = await database;
-    
     double total = (ventaData['monto_total'] as num).toDouble();
-    double baseImponible = total / 1.18;
-    double igv = total - baseImponible;
-
-    ventaData['base_imponible'] = double.parse(baseImponible.toStringAsFixed(2));
-    ventaData['igv'] = double.parse(igv.toStringAsFixed(2));
+    ventaData['base_imponible'] = double.parse((total / 1.18).toStringAsFixed(2));
+    ventaData['igv'] = double.parse((total - ventaData['base_imponible']).toStringAsFixed(2));
     ventaData['estado_comanda'] = 'PENDIENTE';
 
     await db.transaction((txn) async {
       int ventaId = await txn.insert('ventas', ventaData);
-      
       for (var item in items) {
-        await txn.insert('detalle_venta', {
-          'venta_id': ventaId,
-          'producto_id': item['id'],
-          'cantidad': item['qty'],
-          'precio_unitario': item['price'],
-          'subtotal': item['qty'] * item['price'],
-        });
-        
+        await txn.insert('detalle_venta', {'venta_id': ventaId, 'producto_id': item['id'], 'cantidad': item['qty'], 'precio_unitario': item['price'], 'subtotal': item['qty'] * item['price']});
         final hoy = DateTime.now().toIso8601String().split('T')[0];
-        final existeInv = await txn.query('inventario', 
-          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-          whereArgs: [item['id'], ventaData['punto_venta_id'], hoy]
-        );
-
+        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [item['id'], ventaData['punto_venta_id'], hoy]);
         if (existeInv.isEmpty) {
-          await txn.insert('inventario', {
-            'producto_id': item['id'],
-            'punto_venta_id': ventaData['punto_venta_id'],
-            'stock': -(item['qty'] as int),
-            'fecha': hoy,
-          });
+          await txn.insert('inventario', {'producto_id': item['id'], 'punto_venta_id': ventaData['punto_venta_id'], 'stock': -(item['qty'] as int), 'fecha': hoy});
         } else {
-          await txn.rawUpdate(
-            'UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-            [item['qty'], item['id'], ventaData['punto_venta_id'], hoy],
-          );
+          await txn.rawUpdate('UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?', [item['qty'], item['id'], ventaData['punto_venta_id'], hoy]);
         }
       }
-
       if (esCredito) {
         await txn.insert('cuentas_por_cobrar', {
-          'venta_id': ventaId,
-          'cliente_id': ventaData['cliente_id'],
-          'cliente_nombre': ventaData['nombre_cliente'],
-          'cliente_telefono': ventaData['telefono_cliente'],
-          'monto_original': ventaData['monto_total'],
-          'monto_pagado': 0.0,
-          'saldo_pendiente': ventaData['monto_total'],
-          'fecha_venta': ventaData['fecha'],
-          'fecha_vencimiento': DateTime.now().add(Duration(days: 7)).toIso8601String(),
-          'estado': 'PENDIENTE',
-          'punto_venta_id': ventaData['punto_venta_id'],
+          'venta_id': ventaId, 'cliente_id': ventaData['cliente_id'], 'cliente_nombre': ventaData['nombre_cliente'],
+          'cliente_telefono': ventaData['telefono_cliente'], 'monto_original': ventaData['monto_total'], 'monto_pagado': 0.0,
+          'saldo_pendiente': ventaData['monto_total'], 'fecha_venta': ventaData['fecha'],
+          'fecha_vencimiento': DateTime.now().add(Duration(days: 7)).toIso8601String(), 'estado': 'PENDIENTE', 'punto_venta_id': ventaData['punto_venta_id']
         });
       }
     });
@@ -446,12 +345,8 @@ class DatabaseHelper extends ChangeNotifier {
   Future<void> registrarGasto(String categoria, String desc, double monto, int tieneComp, int usuarioId) async {
     final db = await database;
     await db.insert('gastos_internos', {
-      'fecha': DateTime.now().toIso8601String(),
-      'categoria': categoria,
-      'descripcion': desc,
-      'monto': monto,
-      'tiene_comprobante': tieneComp,
-      'usuario_id': usuarioId,
+      'fecha': DateTime.now().toIso8601String(), 'categoria': categoria, 'descripcion': desc,
+      'monto': monto, 'tiene_comprobante': tieneComp, 'usuario_id': usuarioId,
     });
     notifyListeners();
   }
@@ -468,34 +363,19 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async {
     final db = await database;
-    return await db.rawQuery('''
-      SELECT c.*, 
-             COALESCE((SELECT SUM(monto_cobrado) FROM cobros WHERE cuenta_id = c.id), 0) as total_abonado
-      FROM cuentas_por_cobrar c
-      WHERE c.estado != 'PAGADO'
-      ORDER BY c.fecha_venta ASC
-    ''');
+    return await db.rawQuery('SELECT c.*, COALESCE((SELECT SUM(monto_cobrado) FROM cobros WHERE cuenta_id = c.id), 0) as total_abonado FROM cuentas_por_cobrar c WHERE c.estado != \'PAGADO\' ORDER BY c.fecha_venta ASC');
   }
 
   Future<List<Map<String, dynamic>>> consultarCierresDelDia(String fecha) async {
     final db = await database;
-    return await db.rawQuery('''
-      SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre
-      FROM cierres_caja c
-      LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id
-      WHERE c.fecha = ?
-      ORDER BY pv.id
-    ''', [fecha]);
+    return await db.rawQuery('SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre FROM cierres_caja c LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id WHERE c.fecha = ? ORDER BY pv.id', [fecha]);
   }
 
   Future<String> generarCodigoTransferencia(String tipo) async {
     final db = await database;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
     final fechaCompacta = hoy.replaceAll('-', '');
-    final movs = await db.rawQuery(
-      'SELECT COUNT(*) as total FROM transferencias WHERE codigo LIKE ?',
-      ['$tipo-$fechaCompacta-%'],
-    );
+    final movs = await db.rawQuery('SELECT COUNT(*) as total FROM transferencias WHERE codigo LIKE ?', ['$tipo-$fechaCompacta-%']);
     final sec = ((movs.first['total'] as int?) ?? 0) + 1;
     return '$tipo-$fechaCompacta-${sec.toString().padLeft(3, '0')}';
   }
@@ -503,88 +383,41 @@ class DatabaseHelper extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> getStockPuntoVenta(int pvId) async {
     final db = await database;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
-    return await db.rawQuery('''
-      SELECT i.*, p.codigo as prod_codigo, p.nombre as prod_nombre
-      FROM inventario i
-      LEFT JOIN productos p ON i.producto_id = p.id
-      WHERE i.punto_venta_id = ? AND i.fecha = ? AND i.stock > 0
-      ORDER BY p.codigo ASC
-    ''', [pvId, hoy]);
+    return await db.rawQuery('SELECT i.*, p.codigo as prod_codigo, p.nombre as prod_nombre FROM inventario i LEFT JOIN productos p ON i.producto_id = p.id WHERE i.punto_venta_id = ? AND i.fecha = ? AND i.stock > 0 ORDER BY p.codigo ASC', [pvId, hoy]);
   }
 
-  Future<void> registrarTrasladoCompleto({
-    required int origenId,
-    required int destinoId,
-    required int usuarioId,
-    required List<Map<String, dynamic>> items,
-    required String tipo,
-  }) async {
+  Future<void> registrarTrasladoCompleto({required int origenId, required int destinoId, required int usuarioId, required List<Map<String, dynamic>> items, required String tipo}) async {
     final db = await database;
     final codigo = await generarCodigoTransferencia(tipo);
     final ahora = DateTime.now().toIso8601String();
-
     for (var item in items) {
       await db.insert('transferencias', {
-        'fecha': ahora,
-        'producto_id': item['producto_id'],
-        'cantidad': item['cantidad'],
-        'cantidad_recibida': 0,
-        'origen_id': origenId,
-        'destino_id': destinoId,
-        'usuario_id': usuarioId,
-        'tipo': tipo,
-        'codigo': codigo,
-        'estado': 'PENDIENTE',
+        'fecha': ahora, 'producto_id': item['producto_id'], 'cantidad': item['cantidad'],
+        'cantidad_recibida': 0, 'origen_id': origenId, 'destino_id': destinoId,
+        'usuario_id': usuarioId, 'tipo': tipo, 'codigo': codigo, 'estado': 'PENDIENTE',
       });
     }
   }
 
   Future<List<Map<String, dynamic>>> getTrasladosPendientes(int pvId) async {
     final db = await database;
-    return await db.rawQuery('''
-      SELECT t.*, p.codigo as prod_codigo, p.nombre as prod_nombre,
-             o.nombre as origen_nombre, o.codigo as origen_codigo
-      FROM transferencias t
-      LEFT JOIN productos p ON t.producto_id = p.id
-      LEFT JOIN puntos_venta o ON t.origen_id = o.id
-      WHERE t.destino_id = ? AND t.estado = 'PENDIENTE'
-      ORDER BY t.codigo ASC, p.codigo ASC
-    ''', [pvId]);
+    return await db.rawQuery('SELECT t.*, p.codigo as prod_codigo, p.nombre as prod_nombre, o.nombre as origen_nombre, o.codigo as origen_codigo FROM transferencias t LEFT JOIN productos p ON t.producto_id = p.id LEFT JOIN puntos_venta o ON t.origen_id = o.id WHERE t.destino_id = ? AND t.estado = \'PENDIENTE\' ORDER BY t.codigo ASC, p.codigo ASC', [pvId]);
   }
 
-  Future<void> recibirTraslado({
-    required String codigo,
-    required int destinoId,
-    required List<Map<String, dynamic>> itemsConCantidad,
-  }) async {
+  Future<void> recibirTraslado({required String codigo, required int destinoId, required List<Map<String, dynamic>> itemsConCantidad}) async {
     final db = await database;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
-
     for (var item in itemsConCantidad) {
       final id = item['id'] as int;
       final cantRecibida = item['cantidad_recibida'] as int;
       final prodId = item['producto_id'] as int;
-
-      await db.update('transferencias', {
-        'cantidad_recibida': cantRecibida,
-        'estado': 'RECIBIDO',
-      }, where: 'id = ?', whereArgs: [id]);
-
-      final existente = await db.query('inventario',
-          where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-          whereArgs: [prodId, destinoId, hoy]);
-
+      await db.update('transferencias', {'cantidad_recibida': cantRecibida, 'estado': 'RECIBIDO'}, where: 'id = ?', whereArgs: [id]);
+      final existente = await db.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, destinoId, hoy]);
       if (existente.isEmpty) {
-        await db.insert('inventario', {
-          'producto_id': prodId,
-          'punto_venta_id': destinoId,
-          'stock': cantRecibida,
-          'fecha': hoy,
-        });
+        await db.insert('inventario', {'producto_id': prodId, 'punto_venta_id': destinoId, 'stock': cantRecibida, 'fecha': hoy});
       } else {
         final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
-        await db.update('inventario', {'stock': actual + cantRecibida},
-            where: 'id = ?', whereArgs: [existente.first['id']]);
+        await db.update('inventario', {'stock': actual + cantRecibida}, where: 'id = ?', whereArgs: [existente.first['id']]);
       }
     }
   }
@@ -592,27 +425,17 @@ class DatabaseHelper extends ChangeNotifier {
   Future<void> ejecutarDesmedroGlobal(int pvId, int usuarioId) async {
     final db = await database;
     final hoy = DateTime.now().toIso8601String().split('T')[0];
-
-    final stock = await db.query('inventario',
-        where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
-
+    final stock = await db.query('inventario', where: 'punto_venta_id = ? AND fecha = ?', whereArgs: [pvId, hoy]);
     int totalDesmedrado = 0;
     for (var s in stock) {
       final cant = (s['stock'] as num?)?.toInt() ?? 0;
       totalDesmedrado += cant;
-      await db.update('inventario', {'stock': 0},
-          where: 'id = ?', whereArgs: [s['id']]);
+      await db.update('inventario', {'stock': 0}, where: 'id = ?', whereArgs: [s['id']]);
     }
-
     await db.insert('auditoria_cambios', {
-      'fecha': DateTime.now().toIso8601String(),
-      'usuario_id': usuarioId,
-      'usuario_nombre': 'Sistema',
-      'tabla_afectada': 'inventario',
-      'accion': 'DESMEDRO_GLOBAL',
-      'registro_id': pvId,
-      'datos_anteriores': 'Stock: $totalDesmedrado uds',
-      'datos_nuevos': 'Stock: 0 uds',
+      'fecha': DateTime.now().toIso8601String(), 'usuario_id': usuarioId, 'usuario_nombre': 'Sistema',
+      'tabla_afectada': 'inventario', 'accion': 'DESMEDRO_GLOBAL', 'registro_id': pvId,
+      'datos_anteriores': 'Stock: $totalDesmedrado uds', 'datos_nuevos': 'Stock: 0 uds',
     });
   }
 }
