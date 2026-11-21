@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _navegarSegunRol(AuthService auth) {
     final rol = auth.currentUser?['rol'] ?? '';
     if (rol == 'ADMIN') {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboardScreen()));
     } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const VentaScreen()));
     }
