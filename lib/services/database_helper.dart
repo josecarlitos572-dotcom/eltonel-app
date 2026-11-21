@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
@@ -18,7 +20,7 @@ class DatabaseHelper extends ChangeNotifier {
     String path = join(await getDatabasesPath(), dbName);
     return await openDatabase(
       path,
-      version: 15,
+      version: 16,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -47,6 +49,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.execute('''CREATE TABLE asignaciones_diarias (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, punto_venta_id INTEGER, hora_inicio TEXT, hora_fin TEXT, estado TEXT DEFAULT 'ACTIVO', activado_por INTEGER)''');
     await db.execute('''CREATE TABLE parametros (clave TEXT PRIMARY KEY, valor TEXT, descripcion TEXT)''');
     await db.execute('''CREATE TABLE auditoria_cambios (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, usuario_id INTEGER, usuario_nombre TEXT, tabla_afectada TEXT, accion TEXT, registro_id INTEGER, datos_anteriores TEXT, datos_nuevos TEXT)''');
+    await db.execute('''CREATE TABLE batches_serie (serie TEXT PRIMARY KEY, ultimo_correlativo INTEGER DEFAULT 0, ultimo_hash TEXT DEFAULT 'sha256:0000', actualizado_en TEXT)''');
     await _seedSystem(db);
   }
 
@@ -62,9 +65,12 @@ class DatabaseHelper extends ChangeNotifier {
             await db.update('personal', {'password': hash}, where: 'id = ?', whereArgs: [user['id']]);
           }
         }
-      } catch (e) {
-        // La columna ya existe
-      }
+      } catch (e) { /* columna ya existe */ }
+    }
+    if (oldVersion < 16) {
+      try {
+        await db.execute('''CREATE TABLE batches_serie (serie TEXT PRIMARY KEY, ultimo_correlativo INTEGER DEFAULT 0, ultimo_hash TEXT DEFAULT 'sha256:0000', actualizado_en TEXT)''');
+      } catch (e) { /* tabla ya existe */ }
     }
   }
 
@@ -103,7 +109,7 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'admin_whatsapp', 'valor': '51999999999', 'descripcion': 'WhatsApp del admin'},
       {'clave': 'hora_cierre', 'valor': '11:00', 'descripcion': 'Hora sugerida de cierre'},
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
-      {'clave': 'version_bd', 'valor': '15', 'descripcion': 'Versión actual de la BD'},
+      {'clave': 'version_bd', 'valor': '16', 'descripcion': 'Versión actual de la BD'},
     ];
     for (var p in params) {
       await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -190,6 +196,226 @@ class DatabaseHelper extends ChangeNotifier {
         await db.insert('precios', {'producto_id': prodId, 'punto_venta_id': pvId, 'precio': p['precio']});
       }
     }
+  }
+
+  static String calcularHashBatch(Map<String, dynamic> header, List<Map<String, dynamic>> items) {
+    final ordenados = items.toList()
+      ..sort((a, b) => (a['producto_id'] as int).compareTo(b['producto_id'] as int));
+    final canonico = '${header['serie']}|${header['correlativo']}|${header['origen']}|'
+        '${header['destino']}|${header['tipo']}|${header['hash_anterior']}|' +
+        ordenados.map((i) => '${i['producto_id']}:${i['cantidad']}').join(',');
+    return 'sha256:${sha256.convert(utf8.encode(canonico)).toString()}';
+  }
+
+  Future<Map<String, dynamic>> getSerieInfo(String serie) async {
+    final db = await database;
+    final r = await db.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
+    if (r.isEmpty) return {'ultimo_correlativo': 0, 'ultimo_hash': 'sha256:0000'};
+    final row = Map<String, dynamic>.from(r.first);
+    return {
+      'ultimo_correlativo': (row['ultimo_correlativo'] as num?)?.toInt() ?? 0,
+      'ultimo_hash': row['ultimo_hash'] as String? ?? 'sha256:0000',
+    };
+  }
+
+  Future<String> generarBatchJson({
+    required String tipo,
+    required String origenCodigo,
+    required String destinoCodigo,
+    required String emisorDni,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final db = await database;
+    final serie = '$origenCodigo-$destinoCodigo';
+    final info = await getSerieInfo(serie);
+    final correlativo = (info['ultimo_correlativo'] as int) + 1;
+    final hashAnterior = info['ultimo_hash'] as String;
+    final ahora = DateTime.now().toIso8601String();
+    final periodo = ahora.split('T')[0];
+
+    final header = {
+      'tipo': tipo,
+      'version': 2,
+      'serie': serie,
+      'correlativo': correlativo,
+      'origen': origenCodigo,
+      'destino': destinoCodigo,
+      'fecha_generacion': ahora,
+      'emisor_dni': emisorDni,
+      'hash_anterior': hashAnterior,
+    };
+    header['hash'] = calcularHashBatch(header, items);
+
+    final payload = {'items': items};
+    final json = jsonEncode({'header': header, 'payload': payload});
+
+    await db.insert('batches_generados', {
+      'tipo': tipo,
+      'origen': origenCodigo,
+      'destino': destinoCodigo,
+      'periodo': periodo,
+      'secuencial': correlativo,
+      'hash': header['hash'],
+      'hash_anterior': hashAnterior,
+      'contenido_json': json,
+      'fecha_generacion': ahora,
+      'estado': 'GENERADO',
+    });
+
+    return json;
+  }
+
+  Future<Map<String, dynamic>> validarYRegistrarBatch(String jsonString, int pvIdUsuario) async {
+    final db = await database;
+
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+      return {'ok': false, 'msg': 'Filtro 1 · El JSON está corrupto o no es válido.'};
+    }
+    final header = data['header'] as Map<String, dynamic>?;
+    final payload = data['payload'] as Map<String, dynamic>?;
+    if (header == null || payload == null) {
+      return {'ok': false, 'msg': 'Filtro 1 · Estructura incompleta (falta header o payload).'};
+    }
+    if ((header['version'] as num?)?.toInt() != 2) {
+      return {'ok': false, 'msg': 'Filtro 1 · Versión de batch no soportada (se requiere v2).'};
+    }
+
+    final serie = header['serie'] as String? ?? '';
+    final origen = header['origen'] as String? ?? '';
+    final destino = header['destino'] as String? ?? '';
+    final tipo = header['tipo'] as String? ?? '';
+    final correlativo = (header['correlativo'] as num?)?.toInt() ?? -1;
+    final hashRecibido = header['hash'] as String? ?? '';
+    final hashAnteriorRecibido = header['hash_anterior'] as String? ?? '';
+    final fechaStr = header['fecha_generacion'] as String? ?? '';
+
+    if (serie != '$origen-$destino') {
+      return {'ok': false, 'msg': 'Filtro 2 · La serie no coincide con origen-destino.'};
+    }
+
+    final pvRows = await db.query('puntos_venta', where: 'id = ?', whereArgs: [pvIdUsuario]);
+    if (pvRows.isEmpty) return {'ok': false, 'msg': 'Filtro 3 · Tu punto de venta no existe.'};
+    final pvActual = Map<String, dynamic>.from(pvRows.first);
+    if ((pvActual['codigo'] as String?) != destino) {
+      return {'ok': false, 'msg': 'Filtro 3 · Este batch es para $destino, no para tu PV (${pvActual['codigo']}).'};
+    }
+
+    final origenRows = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [origen]);
+    if (origenRows.isEmpty) {
+      return {'ok': false, 'msg': 'Filtro 4 · El emisor "$origen" no existe en el sistema.'};
+    }
+
+    final fechaGen = DateTime.tryParse(fechaStr);
+    if (fechaGen == null) {
+      return {'ok': false, 'msg': 'Filtro 5 · Fecha de generación inválida.'};
+    }
+    final ahora = DateTime.now();
+    if (fechaGen.isAfter(ahora.add(const Duration(minutes: 5)))) {
+      return {'ok': false, 'msg': 'Filtro 5 · El batch tiene fecha futura.'};
+    }
+    if (ahora.difference(fechaGen).inHours > 48) {
+      return {'ok': false, 'msg': 'Filtro 5 · El batch venció (más de 48 horas de antigüedad).'};
+    }
+
+    final info = await getSerieInfo(serie);
+    final esperado = (info['ultimo_correlativo'] as int) + 1;
+    if (correlativo != esperado) {
+      return {'ok': false, 'msg': 'Filtro 6 · Correlativo inválido: se esperaba $esperado, llegó $correlativo.'};
+    }
+
+    if (hashAnteriorRecibido != (info['ultimo_hash'] as String)) {
+      return {'ok': false, 'msg': 'Filtro 7 · La cadena de hash está rota (hash_anterior incorrecto).'};
+    }
+
+    final items = (payload['items'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final headerParaHash = Map<String, dynamic>.from(header)..remove('hash');
+    final hashCalculado = calcularHashBatch(headerParaHash, items);
+    if (hashCalculado != hashRecibido) {
+      return {'ok': false, 'msg': 'Filtro 8 · El hash no coincide: el contenido fue alterado.'};
+    }
+
+    for (var item in items) {
+      final prodId = (item['producto_id'] as num?)?.toInt();
+      final cantidad = (item['cantidad'] as num?)?.toInt() ?? 0;
+      if (prodId == null || cantidad <= 0) {
+        return {'ok': false, 'msg': 'Filtro 9 · Item con producto o cantidad inválida.'};
+      }
+      final prod = await db.query('productos', where: 'id = ? AND activo = 1', whereArgs: [prodId]);
+      if (prod.isEmpty) {
+        return {'ok': false, 'msg': 'Filtro 9 · El producto_id $prodId no existe o está inactivo.'};
+      }
+    }
+
+    final hoy = ahora.toIso8601String().split('T')[0];
+    await db.transaction((txn) async {
+      for (var item in items) {
+        final prodId = (item['producto_id'] as num).toInt();
+        final cantidad = (item['cantidad'] as num).toInt();
+        final existente = await txn.query('inventario',
+            where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
+            whereArgs: [prodId, pvIdUsuario, hoy]);
+        if (existente.isEmpty) {
+          await txn.insert('inventario', {
+            'producto_id': prodId,
+            'punto_venta_id': pvIdUsuario,
+            'stock': cantidad,
+            'fecha': hoy,
+          });
+        } else {
+          final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
+          await txn.update('inventario', {'stock': actual + cantidad},
+              where: 'id = ?', whereArgs: [existente.first['id']]);
+        }
+      }
+
+      final serieRows = await txn.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
+      if (serieRows.isEmpty) {
+        await txn.insert('batches_serie', {
+          'serie': serie,
+          'ultimo_correlativo': correlativo,
+          'ultimo_hash': hashRecibido,
+          'actualizado_en': ahora.toIso8601String(),
+        });
+      } else {
+        await txn.update('batches_serie', {
+          'ultimo_correlativo': correlativo,
+          'ultimo_hash': hashRecibido,
+          'actualizado_en': ahora.toIso8601String(),
+        }, where: 'serie = ?', whereArgs: [serie]);
+      }
+
+      await txn.insert('batches_recibidos', {
+        'tipo': tipo,
+        'origen': origen,
+        'destino': destino,
+        'periodo': hoy,
+        'secuencial': correlativo,
+        'hash': hashRecibido,
+        'hash_anterior': hashAnteriorRecibido,
+        'contenido_json': jsonString,
+        'fecha_generacion': fechaStr,
+        'fecha_recepcion': ahora.toIso8601String(),
+        'estado': 'RECIBIDO',
+      });
+
+      await txn.insert('auditoria_cambios', {
+        'fecha': ahora.toIso8601String(),
+        'usuario_id': pvIdUsuario,
+        'usuario_nombre': 'Sistema',
+        'tabla_afectada': 'inventario',
+        'accion': 'BATCH_RECIBIDO',
+        'registro_id': correlativo,
+        'datos_anteriores': 'serie=$serie hash_anterior=$hashAnteriorRecibido',
+        'datos_nuevos': 'serie=$serie correlativo=$correlativo hash=$hashRecibido items=${items.length}',
+      });
+    });
+
+    return {'ok': true, 'msg': 'Batch $serie #$correlativo recibido · ${items.length} productos cargados.'};
   }
 
   Future<int> registrarClienteSiNoExiste(String nombre, String fono, String dni) async {
