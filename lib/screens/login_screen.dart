@@ -46,8 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _navegarSegunRol(auth);
       }
     } else {
+      final msg = auth.lastError.isNotEmpty ? auth.lastError : 'DNI o contraseña incorrectos';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('DNI o contraseña incorrectos'), backgroundColor: Colors.red),
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
       );
     }
   }
@@ -130,6 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (rol == 'ADMIN') {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboardScreen()));
     } else {
+      // VENDEDOR y VENDEDOR_BETA van a la pantalla de venta
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const VentaScreen()));
     }
   }
