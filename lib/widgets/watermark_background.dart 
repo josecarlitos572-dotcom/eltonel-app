@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+
+class WatermarkBackground extends StatelessWidget {
+  final Widget child;
+
+  const WatermarkBackground({Key? key, required this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. FONDO BASE OSCURO PREMIUM
+        const Positioned.fill(
+          child: ColoredBox(color: Color(0xFF0F0F0F)),
+        ),
+        
+        // 2. MARCA DE AGUA (WATERMARK)
+        Positioned.fill(
+          child: Center(
+            child: Opacity(
+              opacity: 0.04, // 4% de opacidad: sutil pero presente
+              child: Transform.rotate(
+                angle: -0.15, // Ligera inclinación para estilo artístico
+                // NOTA: Cuando tengas tu archivo de logo, reemplaza este Icon por:
+                // Image.asset('assets/logo_el_tonel.png', width: 280, color: Colors.white)
+                child: const Icon(
+                  Icons.restaurant_menu, // Placeholder del logo
+                  size: 280,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // 3. CONTENIDO DE LA PANTALLA
+        child,
+      ],
+    );
+  }
+}
