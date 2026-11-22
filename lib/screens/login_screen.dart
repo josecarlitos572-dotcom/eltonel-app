@@ -131,8 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (rol == 'ADMIN') {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboardScreen()));
     } else {
-      // VENDEDOR y VENDEDOR_BETA van a la pantalla de venta
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const VentaScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => VentaScreen()));
     }
   }
 
