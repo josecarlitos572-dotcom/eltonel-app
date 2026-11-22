@@ -64,8 +64,7 @@ class AuthService extends ChangeNotifier {
           final ini = pv['ini_vta'] as String? ?? '00:00';
           final fin = pv['fin_vta'] as String? ?? '23:59';
           if (!_dentroDeHorario(ini, fin)) {
-            _lastError = 'Fuera del horario de atención ($ini - $fin). '
-                'Usa un VENDEDOR BETA para probar fuera de horario.';
+            _lastError = 'Fuera del horario de atención ($ini - $fin). Usa un VENDEDOR BETA para probar.';
             return false;
           }
         }
@@ -89,10 +88,8 @@ class AuthService extends ChangeNotifier {
     final finMin = (int.tryParse(finPartes[0]) ?? 0) * 60 + (int.tryParse(finPartes[1]) ?? 0);
 
     if (iniMin <= finMin) {
-      // Horario normal dentro del mismo día (ej: 03:00 - 11:00)
       return actual >= iniMin && actual <= finMin;
     } else {
-      // Horario que cruza medianoche (ej: 20:00 - 06:00)
       return actual >= iniMin || actual <= finMin;
     }
   }
@@ -108,7 +105,7 @@ class AuthService extends ChangeNotifier {
       'requiere_cambio_password': 0,
     }, where: 'id = ?', whereArgs: [_currentUser!['id']]);
 
-    // Reemplazamos con una copia mutable (QueryRow es read-only)
+    // Reemplazamos con una copia mutable actualizada
     _currentUser = Map<String, dynamic>.from(_currentUser!)
       ..['password'] = newHash
       ..['requiere_cambio_password'] = 0;
