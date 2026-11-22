@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import 'scanner_screen.dart';
 import 'pv_importar_entrada_screen.dart';
+import 'login_screen.dart';
 
 class VentaScreen extends StatefulWidget {
   const VentaScreen({Key? key}) : super(key: key);
@@ -165,13 +166,137 @@ class _VentaScreenState extends State<VentaScreen> {
       final items = _cart.map((l) => {'id': l['id'], 'qty': l['qty'], 'price': l['price']}).toList();
       await db.registrarVenta(ventaData, items, esCredito: tipo == 'FIADO');
       final monto = _total;
+      final numItems = _units;
       setState(() { _cart.clear(); });
       await _cargarPreciosYStock(DateTime.now().toIso8601String().split('T')[0]);
-      _aviso('Venta $tipo · S/ ${monto.toStringAsFixed(2)}', _green);
+      if (mounted) _mostrarConfirmacionVenta(tipo, monto, numItems);
     } catch (e) {
       _aviso('No se pudo registrar: $e', _red);
     }
     if (mounted) setState(() => _procesando = false);
+  }
+
+  void _mostrarConfirmacionVenta(String tipo, double monto, int numItems) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _green.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle, color: _green, size: 48),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '¡VENTA EXITOSA!',
+              style: TextStyle(
+                color: _green,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Método de pago', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      Text(
+                        tipo == 'EFECTIVO' ? '💵 Efectivo' : tipo == 'ELECTRONICO' ? '📱 Yape/Plin' : '📝 Fiado',
+                        style: TextStyle(
+                          color: tipo == 'EFECTIVO' ? _green : tipo == 'ELECTRONICO' ? _yape : _amber,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white10, height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Artículos', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      Text('$numItems', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const Divider(color: Colors.white10, height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('TOTAL', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(
+                        'S/ ${monto.toStringAsFixed(2)}',
+                        style: const TextStyle(color: _amber, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'CONTINUAR',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmarLogout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('¿Cerrar sesión?', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: const Text('Volverás a la pantalla de inicio de sesión.', style: TextStyle(color: Colors.white70, fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCELAR', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white, minimumSize: const Size(80, 36)),
+            onPressed: () {
+              context.read<AuthService>().logout();
+              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+            },
+            child: const Text('SALIR', style: TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<double?> _dialogoEfectivo() {
@@ -307,6 +432,13 @@ class _VentaScreenState extends State<VentaScreen> {
       Padding(padding: const EdgeInsets.fromLTRB(14, 10, 14, 6), child: Row(children: [
         const Expanded(child: Text('NUEVA VENTA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: .5))),
         Text('S/ ${_total.toStringAsFixed(2)}', style: const TextStyle(color: _amber, fontSize: 26, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.logout, color: _amber, size: 24),
+          onPressed: _confirmarLogout,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
       ])),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: TextField(
         style: const TextStyle(color: Colors.white, fontSize: 14),
