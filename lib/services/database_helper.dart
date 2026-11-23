@@ -375,7 +375,6 @@ Future<Map<String, dynamic>> getResumenMensual() async {
         }
       }
       
-      // ¡AQUÍ ESTABA EL CORTE! Ahora está perfectamente cerrado.
       if (esCredito) {
         await txn.insert('cuentas_por_cobrar', {
           'venta_id': idVenta,
@@ -392,6 +391,6 @@ Future<Map<String, dynamic>> getResumenMensual() async {
           'observaciones': 'Venta a crédito registrada'
         });
       }
-    }); // Cierre de la transacción
-  } // Cierre del método registrarVenta
-} // ¡CIERRE FINAL DE LA CLASE DatabaseHelper!
+    });
+  }
+}
