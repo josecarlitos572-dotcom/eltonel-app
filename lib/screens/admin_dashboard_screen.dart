@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/database_helper.dart';
 import '../services/auth_service.dart';
-import '../widgets/watermark_background.dart';
+import '../widgets/watermark_overlay.dart';
 import 'admin_importar_db_screen.dart';
 import 'admin_backup_screen.dart';
 import 'admin_activar_vendedor_screen.dart';
