@@ -1,40 +1,38 @@
-import 'package:flutter/material.dart'; // 1. Librería principal de Flutter.
-import 'package:provider/provider.dart'; // 2. Para acceder al DatabaseHelper.
-import '../services/database_helper.dart'; // 3. Importamos el servicio de base de datos.
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/database_helper.dart';
 
-class RentabilidadScreen extends StatelessWidget { // 4. Pantalla sin estado mutable.
+class RentabilidadScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final dbHelper = Provider.of<DatabaseHelper>(context); // 5. Obtenemos la instancia del helper.
+    final dbHelper = Provider.of<DatabaseHelper>(context);
     
     return Scaffold(
-      appBar: AppBar(title: Text('MI RENTABILIDAD REAL'), backgroundColor: Colors.black),
+      appBar: AppBar(title: const Text('MI RENTABILIDAD REAL'), backgroundColor: Colors.black),
       backgroundColor: Colors.black,
-      // 6. ¡CORRECCIÓN CLAVE! Cambiamos <List<Map...>> a <Map<String, dynamic>>
-      body: FutureBuilder<Map<String, dynamic>>( 
-        future: dbHelper.getResumenMensual(), // 7. Llamamos al método corregido en el helper.
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: dbHelper.getResumenMensual(),
         builder: (ctx, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) { // 8. Verificamos si aún está cargando.
-            return Center(child: CircularProgressIndicator(color: Colors.yellow)); // 9. Spinner de carga.
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Colors.yellow));
           }
-          if (!snapshot.hasData || snapshot.hasError) { // 10. Verificamos si hay datos o errores.
-            return Center(child: Text('Error al cargar datos', style: TextStyle(color: Colors.red)));
+          if (!snapshot.hasData || snapshot.hasError) {
+            return const Center(child: Text('Error al cargar datos', style: TextStyle(color: Colors.red)));
           }
           
-          var data = snapshot.data!; // 11. ¡CORRECCIÓN! Ya no usamos .first, porque es un Mapa, no una Lista.
+          var data = snapshot.data!;
           
           return Padding(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('RESUMEN DEL MES', style: TextStyle(color: Colors.yellow, fontSize: 20, fontWeight: FontWeight.bold)),
-                SizedBox(height: 30),
-                // 12. Las claves ahora coinciden exactamente con lo que devuelve el helper corregido.
-                _buildRow('VENTAS TOTALES', data['ventas'] ?? 0.0, Colors.green), 
-                _buildRow('GASTOS OPERATIVOS', data['gastos'] ?? 0.0, Colors.red),
-                Divider(color: Colors.white),
-                _buildRow('UTILIDAD NETA (CAJA LIBRE)', data['utilidad'] ?? 0.0, Colors.white, isBig: true),
+                const Text('RESUMEN DEL MES', style: TextStyle(color: Colors.yellow, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 30),
+                _buildRow('VENTAS TOTALES', data['total_ventas'] ?? 0.0, Colors.green),
+                _buildRow('GASTOS OPERATIVOS', data['total_gastos'] ?? 0.0, Colors.red),
+                const Divider(color: Colors.white),
+                _buildRow('UTILIDAD NETA (CAJA LIBRE)', data['rentabilidad'] ?? 0.0, Colors.white, isBig: true),
               ],
             ),
           );
@@ -45,7 +43,7 @@ class RentabilidadScreen extends StatelessWidget { // 4. Pantalla sin estado mut
   
   Widget _buildRow(String label, double amount, Color color, {bool isBig = false}) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
