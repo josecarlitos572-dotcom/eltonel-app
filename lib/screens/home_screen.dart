@@ -1,172 +1,61 @@
-// ============================================================
-// home_screen.dart — Navegación principal de El Tonel
-// Tab inicial por rol · Logo en AppBar · Banner de estado
-// ============================================================
+// Archivo: lib/screens/home_screen.dart
+// Propósito: Pantalla principal de la app "El Tonel" con marca de agua integrada.
 
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
-import '../services/database_helper.dart';
-import 'venta_screen.dart';
-import 'admin_dashboard_screen.dart';
-import 'cierre_caja_screen.dart';
-import 'login_screen.dart';
+import 'package:flutter/material.dart'; // 1. Importamos Flutter.
+import '../widgets/watermark_overlay.dart'; // 2. Importamos el widget de marca de agua.
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+class HomeScreen extends StatelessWidget { // 3. Definimos la pantalla como StatelessWidget.
+  const HomeScreen({Key? key}) : super(key: key); // 4. Constructor estándar.
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _tabIndex = 0;                              // Tab seleccionado
-  bool _aperturado = false;                       // Stock inicial confirmado hoy
-  String? _batchPendiente;                        // Mensaje de batch por recibir
-  static const Color _amber = Color(0xFFFFC107);  // Acento de marca
-  static const Color _bg = Color(0xFF121212);     // Fondo general
-  static const Color _surface = Color(0xFF1E1E1E);// Superficie
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _evaluarEstado());
-  }
-
-  // Evalúa si el vendedor ya confirmó el stock inicial del día.
-  Future<void> _evaluarEstado() async {
-    final db = context.read<DatabaseHelper>();
-    final auth = context.read<AuthService>();
-    final rol = auth.currentUser?['rol'] as String?;
-    final pvId = auth.currentUser?['punto_venta_id_actual'] as int?;
-    if (rol != 'VENDEDOR' || pvId == null || pvId == 0) {
-      setState(() { _aperturado = true; }); // ADMIN no requiere apertura
-      return;
-    }
-    final hoy = DateTime.now().toIso8601String().split('T')[0];
-    final stock = await db.rawQuery(
-      'SELECT SUM(stock) as total FROM inventario WHERE punto_venta_id = ? AND fecha = ?',
-      [pvId, hoy],
-    );
-    final total = (stock.first['total'] as num?)?.toInt() ?? 0;
-    setState(() { _aperturado = total > 0; }); // Hay stock → puede vender
-  }
-
-  // Tabs disponibles según rol.
-  List<Widget> get _tabs {
-    final rol = context.read<AuthService>().currentUser?['rol'] as String?;
-    if (rol == 'ADMIN') {
-      return [
-        AdminDashboardScreen(),
-        VentaScreen(),
-        CierreCajaScreen(),
-      ];
-    }
-    return [
-      VentaScreen(),
-      CierreCajaScreen(),
-    ];
-  }
-
-  // Etiquetas de los tabs según rol.
-  List<String> get _labels {
-    final rol = context.read<AuthService>().currentUser?['rol'] as String?;
-    if (rol == 'ADMIN') return ['DASHBOARD', 'VENDER', 'CIERRE'];
-    return ['VENDER', 'CIERRE'];
-  }
-
-  // Tab inicial según rol.
-  int get _tabInicial {
-    final rol = context.read<AuthService>().currentUser?['rol'] as String?;
-    return rol == 'ADMIN' ? 0 : 0; // ADMIN arranca en DASHBOARD
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.read<AuthService>();
-    final nombre = '${auth.currentUser?['nombres'] ?? ''} ${auth.currentUser?['apellidos'] ?? ''}'.trim();
-    final rol = auth.currentUser?['rol'] as String?;
-    final pvCodigo = auth.currentUser?['punto_venta_id_actual'] == 0
-        ? 'ADMIN'
-        : 'PV ${auth.currentUser?['punto_venta_id_actual'] ?? '?'}';
-
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _surface,
-        elevation: 0,
-        title: Row(children: [
-          // Logo real desde assets
-          Image.asset('assets/logo/eltonel_logo.png', height: 32, width: 32, errorBuilder: (_, __, ___) => const Icon(Icons.breakfast_dining, color: _amber, size: 32)),
-          const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('El Tonel', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            Text('$nombre · $rol · $pvCodigo', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          ]),
-        ]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: _amber),
-            onPressed: () => _confirmarLogout(),
-            tooltip: 'Cerrar sesión',
-          ),
-        ],
+  Widget build(BuildContext context) { // 5. Método que construye la interfaz.
+    return Scaffold( // 6. Scaffold es la estructura base de una pantalla en Flutter.
+      appBar: AppBar( // 7. Barra superior de la app.
+        title: const Text('El Tonel - Inicio'), // 8. Título de la barra.
+        backgroundColor: Colors.brown, // 9. Color de fondo (puedes cambiarlo).
       ),
-      // Banner de estado: apertura de día o batch pendiente
-      body: Column(children: [
-        if (!_aperturado && rol == 'VENDEDOR')
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            color: const Color(0xFFFFA000),
-            child: Row(children: [
-              const Icon(Icons.warning_amber, color: Colors.black, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Debes confirmar el stock inicial del día antes de vender.',
-                  style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w600),
+      body: Stack( // 10. ¡AQUÍ ESTÁ LA CLAVE! Stack permite superponer capas.
+        children: [ // 11. Lista de widgets que se apilan uno sobre otro.
+          
+          // 12. PRIMERA CAPA: Tu contenido normal de la pantalla.
+          // Aquí va todo lo que normalmente tendrías (Column, ListView, etc.)
+          Center( // 13. Centramos el contenido en la pantalla.
+            child: Column( // 14. Column apila widgets verticalmente.
+              mainAxisAlignment: MainAxisAlignment.center, // 15. Centra verticalmente.
+              children: [ // 16. Lista de widgets dentro de la Column.
+                const Icon( // 17. Un ícono de ejemplo.
+                  Icons.restaurant_menu,
+                  size: 100,
+                  color: Colors.brown,
                 ),
-              ),
-            ]),
+                const SizedBox(height: 20), // 18. Espacio vertical.
+                const Text( // 19. Texto de ejemplo.
+                  'Bienvenido a El Tonel',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10), // 20. Otro espacio vertical.
+                ElevatedButton( // 21. Un botón de ejemplo.
+                  onPressed: () {
+                    // Aquí va la acción del botón.
+                  },
+                  child: const Text('Ver Menú'),
+                ),
+              ],
+            ),
           ),
-        Expanded(child: _tabs[_tabIndex]),
-      ]),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: _surface,
-        currentIndex: _tabIndex,
-        onTap: (i) => setState(() => _tabIndex = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: _amber,
-        unselectedItemColor: Colors.white54,
-        items: _labels.map((l) => BottomNavigationBarItem(
-          icon: Icon(l == 'DASHBOARD' ? Icons.dashboard : l == 'VENDER' ? Icons.point_of_sale : Icons.lock_clock),
-          label: l,
-        )).toList(),
-      ),
-    );
-  }
 
-  // Logout con confirmación.
-  void _confirmarLogout() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: _surface,
-        title: const Text('¿Cerrar sesión?', style: TextStyle(color: Colors.white)),
-        content: const Text('Se cerrará la sesión en este dispositivo.', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _amber, foregroundColor: Colors.black),
-            onPressed: () {
-              context.read<AuthService>().logout();
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
-            },
-            child: const Text('SALIR'),
+          // 22. SEGUNDA CAPA: La marca de agua (va AL FINAL para quedar encima de todo).
+          const WatermarkOverlay( // 23. Llamamos al widget de marca de agua.
+            text: 'El Tonel', // 24. Texto que mostrará.
+            opacity: 0.08, // 25. Opacidad muy baja para que sea sutil.
+            fontSize: 50.0, // 26. Tamaño grande para cubrir el fondo.
           ),
-        ],
-      ),
-    );
-  }
-}
+          
+        ], // 27. Cierre de la lista 'children' del Stack.
+      ), // 28. Cierre del widget Stack.
+    ); // 29. Cierre del Scaffold.
+  } // 30. Cierre del método build.
+} // 31. Cierre de la clase HomeScreen.
