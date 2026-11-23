@@ -47,7 +47,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.execute('''CREATE TABLE batches_serie (serie TEXT PRIMARY KEY, ultimo_correlativo INTEGER DEFAULT 0, ultimo_hash TEXT DEFAULT 'sha256:0000', actualizado_en TEXT)''');
     await _seedSystem(db);
   }
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 15) {
       try {
         await db.execute('ALTER TABLE personal ADD COLUMN requiere_cambio_password INTEGER DEFAULT 1');
@@ -99,6 +99,7 @@ class DatabaseHelper extends ChangeNotifier {
     ];
     for (var p in params) { await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore); }
   }
+
   Future<void> _seedProductosYCategorias(Database db) async {
     final categorias = [
       {'nombre': 'Sándwiches', 'abreviatura': 'SAN', 'orden': 1}, {'nombre': 'Bebidas Calientes', 'abreviatura': 'BEC', 'orden': 2},
@@ -141,17 +142,9 @@ class DatabaseHelper extends ChangeNotifier {
       {'codigo': 'G26', 'nombre': 'Patasca', 'cat': 7, 'precio': 15.0},
     ];
     for (var p in productos) {
-      int prodId = await db.insert('productos', {
-        'codigo': p['codigo'],
-        'nombre': p['nombre'],
-        'categoria_id': p['cat']
-      });
+      int prodId = await db.insert('productos', {'codigo': p['codigo'], 'nombre': p['nombre'], 'categoria_id': p['cat']});
       for (int pvId in [1, 2, 3, 4]) {
-        await db.insert('precios', {
-          'producto_id': prodId,
-          'punto_venta_id': pvId,
-          'precio': p['precio']
-        });
+        await db.insert('precios', {'producto_id': prodId, 'punto_venta_id': pvId, 'precio': p['precio']});
       }
     }
   }
@@ -189,30 +182,18 @@ class DatabaseHelper extends ChangeNotifier {
     final fecha = DateTime.now().toIso8601String();
 
     final header = {
-      'tipo': tipo,
-      'version': 2,
-      'serie': serie,
-      'correlativo': correlativo,
-      'origen': origenCodigo,
-      'destino': destinoCodigo,
-      'fecha_generacion': fecha,
-      'emisor_dni': dniEmisor,
-      'hash_anterior': hashAnterior
+      'tipo': tipo, 'version': 2, 'serie': serie, 'correlativo': correlativo,
+      'origen': origenCodigo, 'destino': destinoCodigo, 'fecha_generacion': fecha,
+      'emisor_dni': dniEmisor, 'hash_anterior': hashAnterior
     };
     header['hash'] = calcularHashBatch(header, items);
     final jsonFinal = jsonEncode({'header': header, 'payload': {'items': items}});
 
     await db.insert('batches_generados', {
-      'tipo': tipo,
-      'origen': origenCodigo,
-      'destino': destinoCodigo,
-      'periodo': fecha.split('T')[0],
-      'secuencial': correlativo,
-      'hash': header['hash'],
-      'hash_anterior': hashAnterior,
-      'contenido_json': jsonFinal,
-      'fecha_generacion': fecha,
-      'estado': 'GENERADO'
+      'tipo': tipo, 'origen': origenCodigo, 'destino': destinoCodigo,
+      'periodo': fecha.split('T')[0], 'secuencial': correlativo, 'hash': header['hash'],
+      'hash_anterior': hashAnterior, 'contenido_json': jsonFinal,
+      'fecha_generacion': fecha, 'estado': 'GENERADO'
     });
     return jsonFinal;
   }
@@ -220,11 +201,9 @@ class DatabaseHelper extends ChangeNotifier {
   Future<Map<String, dynamic>> validarYRegistrarBatch(String jsonString, int idPuntoVentaUsuario) async {
     final db = await database;
     Map<String, dynamic> data;
-    try {
-      data = jsonDecode(jsonString) as Map<String, dynamic>;
-    } catch (e) {
-      return {'ok': false, 'msg': 'Filtro 1: JSON inválido'};
-    }
+    try { data = jsonDecode(jsonString) as Map<String, dynamic>; } 
+    catch (e) { return {'ok': false, 'msg': 'Filtro 1: JSON inválido'}; }
+    
     final header = data['header'] as Map<String, dynamic>?;
     final payload = data['payload'] as Map<String, dynamic>?;
     if (header == null || payload == null) return {'ok': false, 'msg': 'Filtro 1: Estructura incompleta'};
@@ -240,9 +219,7 @@ class DatabaseHelper extends ChangeNotifier {
 
     if (serie != '$origen-$destino') return {'ok': false, 'msg': 'Filtro2: Serie no coincide'};
     final pvUsuario = await db.query('puntos_venta', where: 'id = ?', whereArgs: [idPuntoVentaUsuario]);
-    if (pvUsuario.isEmpty || (pvUsuario.first['codigo'] as String?) != destino) {
-      return {'ok': false, 'msg': 'Filtro3: Destino incorrecto'};
-    }
+    if (pvUsuario.isEmpty || (pvUsuario.first['codigo'] as String?) != destino) return {'ok': false, 'msg': 'Filtro3: Destino incorrecto'};
     final pvOrigen = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [origen]);
     if (pvOrigen.isEmpty) return {'ok': false, 'msg': 'Filtro4: Origen no existe'};
 
@@ -254,25 +231,17 @@ class DatabaseHelper extends ChangeNotifier {
     }
 
     final infoSerie = await getSerieInfo(serie);
-    if (correlativo != infoSerie['ultimo_correlativo'] + 1) {
-      return {'ok': false, 'msg': 'Filtro6: Correlativo desordenado'};
-    }
-    if (hashAnteriorRecibido != infoSerie['ultimo_hash']) {
-      return {'ok': false, 'msg': 'Filtro7: Hash anterior no coincide'};
-    }
+    if (correlativo != infoSerie['ultimo_correlativo'] + 1) return {'ok': false, 'msg': 'Filtro6: Correlativo desordenado'};
+    if (hashAnteriorRecibido != infoSerie['ultimo_hash']) return {'ok': false, 'msg': 'Filtro7: Hash anterior no coincide'};
 
     final items = (payload['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)).toList();
     final headerParaHash = Map<String, dynamic>.from(header)..remove('hash');
-    if (calcularHashBatch(headerParaHash, items) != hashRecibido) {
-      return {'ok': false, 'msg': 'Filtro8: Hash de integridad falló'};
-    }
+    if (calcularHashBatch(headerParaHash, items) != hashRecibido) return {'ok': false, 'msg': 'Filtro8: Hash de integridad falló'};
 
     for (var item in items) {
       final prodId = (item['producto_id'] as num?)?.toInt();
       final cantidad = (item['cantidad'] as num?)?.toInt();
-      if (prodId == null || cantidad == null || cantidad <= 0) {
-        return {'ok': false, 'msg': 'Filtro9: Item inválido'};
-      }
+      if (prodId == null || cantidad == null || cantidad <= 0) return {'ok': false, 'msg': 'Filtro9: Item inválido'};
       final prodExiste = await db.query('productos', where: 'id = ? AND activo = 1', whereArgs: [prodId]);
       if (prodExiste.isEmpty) return {'ok': false, 'msg': 'Filtro9: Producto no existe'};
     }
@@ -282,118 +251,46 @@ class DatabaseHelper extends ChangeNotifier {
       for (var item in items) {
         final prodId = (item['producto_id'] as num).toInt();
         final cantidad = (item['cantidad'] as num).toInt();
-        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-            whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
+        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
         if (existeInv.isEmpty) {
-          await txn.insert('inventario', {
-            'producto_id': prodId,
-            'punto_venta_id': idPuntoVentaUsuario,
-            'stock': cantidad,
-            'fecha': fechaHoy
-          });
+          await txn.insert('inventario', {'producto_id': prodId, 'punto_venta_id': idPuntoVentaUsuario, 'stock': cantidad, 'fecha': fechaHoy});
         } else {
           final stockActual = (existeInv.first['stock'] as num).toInt();
-          await txn.update('inventario', {'stock': stockActual + cantidad},
-              where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?',
-              whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
+          await txn.update('inventario', {'stock': stockActual + cantidad}, where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
         }
       }
-      await txn.update('batches_serie', {
-        'ultimo_correlativo': correlativo,
-        'ultimo_hash': hashRecibido,
-        'actualizado_en': DateTime.now().toIso8601String()
-      }, where: 'serie = ?', whereArgs: [serie]);
-
+      await txn.update('batches_serie', {'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': DateTime.now().toIso8601String()}, where: 'serie = ?', whereArgs: [serie]);
       await txn.insert('batches_recibidos', {
-        'tipo': header['tipo'],
-        'origen': origen,
-        'destino': destino,
-        'periodo': fechaHoy,
-        'secuencial': correlativo,
-        'hash': hashRecibido,
-        'hash_anterior': hashAnteriorRecibido,
-        'contenido_json': jsonString,
-        'fecha_generacion': fechaStr,
-        'fecha_recepcion': DateTime.now().toIso8601String(),
-        'estado': 'RECIBIDO'
+        'tipo': header['tipo'], 'origen': origen, 'destino': destino, 'periodo': fechaHoy, 'secuencial': correlativo,
+        'hash': hashRecibido, 'hash_anterior': hashAnteriorRecibido, 'contenido_json': jsonString,
+        'fecha_generacion': fechaStr, 'fecha_recepcion': DateTime.now().toIso8601String(), 'estado': 'RECIBIDO'
       });
     });
     return {'ok': true, 'msg': 'Batch $serie #$correlativo registrado, ${items.length} productos'};
   }
 
   Future<void> _loadCache() async {}
-
-  Future<int> insertar(String tabla, Map<String, dynamic> datos) async {
-    final db = await database;
-    return await db.insert(tabla, datos);
-  }
-
-  Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async {
-    final db = await database;
-    return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
-  }
-
-  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? args]) async {
-    final db = await database;
-    return await db.rawQuery(sql, args);
-  }
-
+  Future<int> insertar(String tabla, Map<String, dynamic> datos) async { final db = await database; return await db.insert(tabla, datos); }
+  Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async { final db = await database; return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy); }
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? args]) async { final db = await database; return await db.rawQuery(sql, args); }
   Future<int> actualizar(String tabla, Map<String, dynamic> datos, {String? where, List<Object?>? whereArgs}) async {
     final db = await database;
-    if (where == null && datos.containsKey('id')) {
-      return await db.update(tabla, datos, where: 'id = ?', whereArgs: [datos['id']]);
-    }
+    if (where == null && datos.containsKey('id')) return await db.update(tabla, datos, where: 'id = ?', whereArgs: [datos['id']]);
     return await db.update(tabla, datos, where: where, whereArgs: whereArgs);
   }
-
-  Future<int> eliminar(String tabla, int id) async {
-    final db = await database;
-    return await db.delete(tabla, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<String?> getParametro(String clave) async {
-    final db = await database;
-    final res = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]);
-    return res.isNotEmpty ? res.first['valor'] as String? : null;
-  }
-
-  Future<void> setParametro(String clave, String valor, {String? descripcion}) async {
-    final db = await database;
-    await db.insert('parametros', {
-      'clave': clave,
-      'valor': valor,
-      'descripcion': descripcion ?? 'Actualizado desde app'
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<List<Map<String, dynamic>>> getCategoriasGasto() async {
-    final db = await database;
-    return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC');
-  }
-
-  Future<int> reactivarProducto(int id) async {
-    final db = await database;
-    return await db.update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> eliminarProductoLogico(int id) async {
-    final db = await database;
-    return await db.update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<List<Map<String, dynamic>>> getPreciosProducto(int productoId) async {
-    final db = await database;
-    return await db.query('precios', where: 'producto_id = ?', whereArgs: [productoId]);
-  }
-
+  Future<int> eliminar(String tabla, int id) async { final db = await database; return await db.delete(tabla, where: 'id = ?', whereArgs: [id]); }
+  Future<String?> getParametro(String clave) async { final db = await database; final res = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]); return res.isNotEmpty ? res.first['valor'] as String? : null; }
+  Future<void> setParametro(String clave, String valor, {String? descripcion}) async { final db = await database; await db.insert('parametros', {'clave': clave, 'valor': valor, 'descripcion': descripcion ?? 'Actualizado desde app'}, conflictAlgorithm: ConflictAlgorithm.replace); }
+  Future<List<Map<String, dynamic>>> getCategoriasGasto() async { final db = await database; return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC'); }
+  Future<int> reactivarProducto(int id) async { final db = await database; return await db.update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [id]); }
+  Future<int> eliminarProductoLogico(int id) async { final db = await database; return await db.update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [id]); }
+  Future<List<Map<String, dynamic>>> getPreciosProducto(int productoId) async { final db = await database; return await db.query('precios', where: 'producto_id = ?', whereArgs: [productoId]); }
+  
   Future<void> insertarProductoConPrecios(Map<String, dynamic> producto, List<Map<String, dynamic>> listaPrecios) async {
     final db = await database;
     await db.transaction((txn) async {
       final prodId = await txn.insert('productos', producto);
-      for (var precio in listaPrecios) {
-        precio['producto_id'] = prodId;
-        await txn.insert('precios', precio);
-      }
+      for (var precio in listaPrecios) { precio['producto_id'] = prodId; await txn.insert('precios', precio); }
     });
   }
 
@@ -402,30 +299,23 @@ class DatabaseHelper extends ChangeNotifier {
     await db.transaction((txn) async {
       await txn.update('productos', producto, where: 'id = ?', whereArgs: [productoId]);
       await txn.delete('precios', where: 'producto_id = ?', whereArgs: [productoId]);
-      for (var precio in listaPrecios) {
-        precio['producto_id'] = productoId;
-        await txn.insert('precios', precio);
-      }
+      for (var precio in listaPrecios) { precio['producto_id'] = productoId; await txn.insert('precios', precio); }
     });
   }
 
-  Future<int> registrarGasto(Map<String, dynamic> datosGasto) async {
-    final db = await database;
-    return await db.insert('gastos_internos', datosGasto);
-  }
-
-  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async {
-    final db = await database;
-    return await db.query('cuentas_por_cobrar', where: "estado = 'PENDIENTE'", orderBy: 'fecha_vencimiento ASC');
-  }
-
-  Future<Map<String, dynamic>> getResumenMensual() async {
+  Future<int> registrarGasto(Map<String, dynamic> datosGasto) async { final db = await database; return await db.insert('gastos_internos', datosGasto); }
+  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async { final db = await database; return await db.query('cuentas_por_cobrar', where: "estado = 'PENDIENTE'", orderBy: 'fecha_vencimiento ASC'); }
+Future<Map<String, dynamic>> getResumenMensual() async {
     final db = await database;
     final ventas = await db.rawQuery('SELECT SUM(monto_total) AS total FROM ventas');
     final gastos = await db.rawQuery('SELECT SUM(monto) AS total FROM gastos_internos');
     final totalVentas = (ventas.first['total'] as num?)?.toDouble() ?? 0.0;
     final totalGastos = (gastos.first['total'] as num?)?.toDouble() ?? 0.0;
-    return {'total_ventas': totalVentas, 'total_gastos': totalGastos, 'rentabilidad': totalVentas - totalGastos};
+    return {
+      'total_ventas': totalVentas,
+      'total_gastos': totalGastos,
+      'rentabilidad': totalVentas - totalGastos
+    };
   }
 
   Future<List<Map<String, dynamic>>> getProductos() async {
@@ -484,40 +374,24 @@ class DatabaseHelper extends ChangeNotifier {
               whereArgs: [item['id'], datosVenta['punto_venta_id'], fechaHoy]);
         }
       }
+      
+      // ¡AQUÍ ESTABA EL CORTE! Ahora está perfectamente cerrado.
       if (esCredito) {
         await txn.insert('cuentas_por_cobrar', {
-'venta_id': idVenta, // 1. Vinculamos este cobro con la venta realizada.
-            'cliente_id': datosVenta['cliente_id'], // 2. ID del cliente que debe.
-            'cliente_nombre': datosVenta['nombre_cliente'] ?? 'Cliente General', // 3. Nombre del cliente (con valor por defecto).
-            'cliente_telefono': datosVenta['telefono_cliente'] ?? '', // 4. Teléfono del cliente.
-            'monto_original': montoTotal, // 5. Monto total original de la deuda.
-            'monto_pagado': 0.0, // 6. Al inicio, no se ha pagado nada.
-            'saldo_pendiente': montoTotal, // 7. La deuda inicial es igual al monto total.
-            'fecha_venta': datosVenta['fecha'], // 8. Fecha en que se hizo la venta.
-            'fecha_vencimiento': datosVenta['fecha_vencimiento'] ?? datosVenta['fecha'], // 9. Fecha límite de pago.
-            'estado': 'PENDIENTE', // 10. Estado inicial de la cuenta por cobrar.
-            'punto_venta_id': datosVenta['punto_venta_id'], // 11. Punto de venta donde se generó la deuda.
-            'observaciones': 'Venta a crédito registrada desde la app' // 12. Nota aclaratoria.
-          });
-        }
-      }); // 13. ¡Cierre de la transacción de la base de datos!
-    } // 14. ¡Cierre del método registrarVenta!
-
-    // 15. Método corregido para que coincida con lo que espera la pantalla de Rentabilidad.
-    Future<Map<String, dynamic>> getResumenMensual() async {
-      final db = await database; // 16. Obtenemos la instancia de la base de datos.
-      // 17. Consultamos la suma total de ventas.
-      final ventas = await db.rawQuery('SELECT SUM(monto_total) AS total FROM ventas'); 
-      // 18. Consultamos la suma total de gastos.
-      final gastos = await db.rawQuery('SELECT SUM(monto) AS total FROM gastos_internos'); 
-      // 19. Extraemos el valor numérico o usamos 0.0 si es nulo.
-      final totalVentas = (ventas.first['total'] as num?)?.toDouble() ?? 0.0; 
-      final totalGastos = (gastos.first['total'] as num?)?.toDouble() ?? 0.0; 
-      // 20. Retornamos un Mapa con las claves exactas que la UI espera ('ventas', 'gastos', 'utilidad').
-      return {
-        'ventas': totalVentas, 
-        'gastos': totalGastos, 
-        'utilidad': totalVentas - totalGastos
-      };
-    }
-  } // 21. ¡CIERRE FINAL DE LA CLASE DatabaseHelper! (Esto faltaba y causaba los errores)
+          'venta_id': idVenta,
+          'cliente_id': datosVenta['cliente_id'],
+          'cliente_nombre': datosVenta['nombre_cliente'] ?? 'Cliente General',
+          'cliente_telefono': datosVenta['telefono_cliente'] ?? '',
+          'monto_original': montoTotal,
+          'monto_pagado': 0.0,
+          'saldo_pendiente': montoTotal,
+          'fecha_venta': datosVenta['fecha'],
+          'fecha_vencimiento': datosVenta['fecha_vencimiento'] ?? datosVenta['fecha'],
+          'estado': 'PENDIENTE',
+          'punto_venta_id': datosVenta['punto_venta_id'],
+          'observaciones': 'Venta a crédito registrada'
+        });
+      }
+    }); // Cierre de la transacción
+  } // Cierre del método registrarVenta
+} // ¡CIERRE FINAL DE LA CLASE DatabaseHelper!
