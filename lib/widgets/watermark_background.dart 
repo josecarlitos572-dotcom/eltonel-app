@@ -1,31 +1,8 @@
+// Este archivo es INDEPENDIENTE
+// Ruta: lib/widgets/watermark_overlay.dart
+
 import 'package:flutter/material.dart';
 
-class WatermarkBackground extends StatelessWidget {
-  final Widget child;
-  const WatermarkBackground({Key? key, required this.child}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            bottom: 20, right: 20,
-            child: Opacity(
-              opacity: 0.05,
-              child: Icon(Icons.local_cafe, size: 200, color: Colors.white),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
+class WatermarkOverlay extends StatelessWidget {
+  // ... todo el código de la Parte 1 ...
 }
