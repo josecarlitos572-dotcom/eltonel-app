@@ -18,12 +18,7 @@ class DatabaseHelper extends ChangeNotifier {
 
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), dbName);
-    return await openDatabase(
-      path,
-      version: 16,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    return await openDatabase(path, version: 16, onCreate: _onCreate, onUpgrade: _onUpgrade);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -61,16 +56,15 @@ class DatabaseHelper extends ChangeNotifier {
         for (var user in users) {
           final password = user['password'] as String? ?? '';
           if (password.isNotEmpty && !password.contains(':')) {
-            final hash = PasswordService.hashPassword(password);
-            await db.update('personal', {'password': hash}, where: 'id = ?', whereArgs: [user['id']]);
+            await db.update('personal', {'password': PasswordService.hashPassword(password)}, where: 'id = ?', whereArgs: [user['id']]);
           }
         }
-      } catch (e) { /* columna ya existe */ }
+      } catch (e) {}
     }
     if (oldVersion < 16) {
       try {
         await db.execute('''CREATE TABLE batches_serie (serie TEXT PRIMARY KEY, ultimo_correlativo INTEGER DEFAULT 0, ultimo_hash TEXT DEFAULT 'sha256:0000', actualizado_en TEXT)''');
-      } catch (e) { /* tabla ya existe */ }
+      } catch (e) {}
     }
   }
 
@@ -79,7 +73,6 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('puntos_venta', {'id': 2, 'nombre': 'Santa Rosa', 'codigo': 'SR1', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
     await db.insert('puntos_venta', {'id': 3, 'nombre': 'Víctor Raúl 1', 'codigo': 'VR1', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
     await db.insert('puntos_venta', {'id': 4, 'nombre': 'Víctor Raúl 2', 'codigo': 'VR2', 'direccion': '', 'dia_descanso': 'dom', 'ini_vta': '03:00', 'fin_vta': '11:00'});
-
     await db.insert('categorias_gasto', {'nombre': 'SS.HH.', 'limite_max': 2.0});
     await db.insert('categorias_gasto', {'nombre': 'Flete Llegada', 'limite_max': 6});
     await db.insert('categorias_gasto', {'nombre': 'Flete Salida', 'limite_max': 6});
@@ -88,13 +81,7 @@ class DatabaseHelper extends ChangeNotifier {
     await db.insert('categorias_gasto', {'nombre': 'Vasos Plásticos', 'limite_max': 4});
     await db.insert('categorias_gasto', {'nombre': 'Rellenos Panes', 'limite_max': 12});
     await db.insert('categorias_gasto', {'nombre': 'Desayuno', 'limite_max': 6});
-
-    final adminHash = PasswordService.hashPassword('JOse\$\$11');
-    await db.insert('personal', {
-      'apellidos': 'ADMIN', 'nombres': 'PRINCIPAL', 'dni': '09878372',
-      'rol': 'ADMIN', 'password': adminHash, 'punto_venta_id': 1, 'requiere_cambio_password': 1
-    });
-
+    await db.insert('personal', {'apellidos': 'ADMIN', 'nombres': 'PRINCIPAL', 'dni': '09878372', 'rol': 'ADMIN', 'password': PasswordService.hashPassword('JOse\$\$11'), 'punto_venta_id': 1, 'requiere_cambio_password': 1});
     await _seedProductosYCategorias(db);
     await _seedParametros(db);
   }
@@ -111,257 +98,223 @@ class DatabaseHelper extends ChangeNotifier {
       {'clave': 'inactividad_minutos', 'valor': '5', 'descripcion': 'Minutos para logout'},
       {'clave': 'version_bd', 'valor': '16', 'descripcion': 'Versión actual de la BD'},
     ];
-    for (var p in params) {
-      await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
+    for (var p in params) { await db.insert('parametros', p, conflictAlgorithm: ConflictAlgorithm.ignore); }
   }
 
   Future<void> _seedProductosYCategorias(Database db) async {
     final categorias = [
-      {'nombre': 'Sándwiches', 'abreviatura': 'SAN', 'orden': 1},
-      {'nombre': 'Bebidas Calientes', 'abreviatura': 'BEC', 'orden': 2},
-      {'nombre': 'Bebidas Frías', 'abreviatura': 'BEF', 'orden': 3},
-      {'nombre': 'Jugos', 'abreviatura': 'JUG', 'orden': 4},
-      {'nombre': 'Ensaladas', 'abreviatura': 'ENS', 'orden': 5},
-      {'nombre': 'Huevos Sancochados', 'abreviatura': 'HUE', 'orden': 6},
+      {'nombre': 'Sándwiches', 'abreviatura': 'SAN', 'orden': 1}, {'nombre': 'Bebidas Calientes', 'abreviatura': 'BEC', 'orden': 2},
+      {'nombre': 'Bebidas Frías', 'abreviatura': 'BEF', 'orden': 3}, {'nombre': 'Jugos', 'abreviatura': 'JUG', 'orden': 4},
+      {'nombre': 'Ensaladas', 'abreviatura': 'ENS', 'orden': 5}, {'nombre': 'Huevos Sancochados', 'abreviatura': 'HUE', 'orden': 6},
       {'nombre': 'Comidas', 'abreviatura': 'COM', 'orden': 7},
     ];
-    for (var cat in categorias) await db.insert('categorias_producto', cat);
+    for (var cat in categorias) { await db.insert('categorias_producto', cat); }
 
     final productos = [
-      {'codigo': 'A01', 'nombre': 'Pollo Deshilachado', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A02', 'nombre': 'Saltado', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A03', 'nombre': 'Huevo Frito', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A04', 'nombre': 'Tortilla Hot Dog', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A05', 'nombre': 'Tortilla Papa', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A06', 'nombre': 'Tortilla Verduras', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A07', 'nombre': 'Queso', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A08', 'nombre': 'Jamón & Queso', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A09', 'nombre': 'Relleno', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A10', 'nombre': 'Salchicha Huachana', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A11', 'nombre': 'Pejerrey', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A12', 'nombre': 'Camote & Queso', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A13', 'nombre': 'Palta', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A14', 'nombre': 'Hamburguesa Carne', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A15', 'nombre': 'Milanesa Pollo', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A16', 'nombre': 'Chorizo o Salchicha', 'cat': 1, 'precio': 2.0},
-      {'codigo': 'A17', 'nombre': 'Chicharrón', 'cat': 1, 'precio': 4.0},
-      {'codigo': 'B01', 'nombre': 'Quinua', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B02', 'nombre': 'Maca', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B03', 'nombre': '7 Semillas', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B04', 'nombre': 'Avena Manzana', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B05', 'nombre': 'Avena Leche', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B06', 'nombre': 'Café', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B07', 'nombre': 'Café Leche', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'B08', 'nombre': 'Chocolate Leche', 'cat': 2, 'precio': 2.0},
-      {'codigo': 'C01', 'nombre': 'Chicha', 'cat': 3, 'precio': 2.0},
-      {'codigo': 'C02', 'nombre': 'Maracuyá', 'cat': 3, 'precio': 2.0},
-      {'codigo': 'C03', 'nombre': 'Piña', 'cat': 3, 'precio': 2.0},
-      {'codigo': 'D01', 'nombre': 'Fresa Leche', 'cat': 4, 'precio': 3.0},
-      {'codigo': 'D02', 'nombre': 'Papaya', 'cat': 4, 'precio': 2.0},
-      {'codigo': 'D03', 'nombre': 'Mango', 'cat': 4, 'precio': 2.0},
-      {'codigo': 'E01', 'nombre': 'Ensalada Frutas', 'cat': 5, 'precio': 5.0},
-      {'codigo': 'F01', 'nombre': 'Huevo Sancochado', 'cat': 6, 'precio': 1.0},
-      {'codigo': 'G01', 'nombre': 'Arroz Chaufa / Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G02', 'nombre': 'Arroz Chaufa / Cerdo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G03', 'nombre': 'Arroz Chaufa / Lomito', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G04', 'nombre': 'Arroz Chaufa / Cubana', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G05', 'nombre': 'Arroz Cubana', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G06', 'nombre': 'Lomo Saltado', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G07', 'nombre': 'Arroz Tapado', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G08', 'nombre': 'Arroz con Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G09', 'nombre': 'Arroz con Pollo / Huancaína', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G10', 'nombre': 'Tallarín Rojo Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G11', 'nombre': 'Tallarín Rojo Pollo / Huancaína', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G12', 'nombre': 'Tallarín Rojo Carne', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G13', 'nombre': 'Tallarín Rojo Carne Huancaína', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G14', 'nombre': 'Papa Rellena', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G15', 'nombre': 'Escabeche Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G16', 'nombre': 'Escabeche Pescado', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G17', 'nombre': 'Estofado Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G18', 'nombre': 'Estofado Carne', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G19', 'nombre': 'Picante Carne', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G20', 'nombre': 'Picante Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G21', 'nombre': 'Milanesa Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G22', 'nombre': 'Arroz Jardinera Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G23', 'nombre': 'Arroz Jardinera Cerdo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G24', 'nombre': 'Seco Pollo', 'cat': 7, 'precio': 5.0},
-      {'codigo': 'G25', 'nombre': 'Caldo Gallina', 'cat': 7, 'precio': 10.0},
+      {'codigo': 'A01', 'nombre': 'Pollo Deshilachado', 'cat': 1, 'precio': 2.0}, {'codigo': 'A02', 'nombre': 'Saltado', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A03', 'nombre': 'Huevo Frito', 'cat': 1, 'precio': 2.0}, {'codigo': 'A04', 'nombre': 'Tortilla Hot Dog', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A05', 'nombre': 'Tortilla Papa', 'cat': 1, 'precio': 2.0}, {'codigo': 'A06', 'nombre': 'Tortilla Verduras', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A07', 'nombre': 'Queso', 'cat': 1, 'precio': 2.0}, {'codigo': 'A08', 'nombre': 'Jamón & Queso', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A09', 'nombre': 'Relleno', 'cat': 1, 'precio': 2.0}, {'codigo': 'A10', 'nombre': 'Salchicha Huachana', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A11', 'nombre': 'Pejerrey', 'cat': 1, 'precio': 2.0}, {'codigo': 'A12', 'nombre': 'Camote & Queso', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A13', 'nombre': 'Palta', 'cat': 1, 'precio': 2.0}, {'codigo': 'A14', 'nombre': 'Hamburguesa Carne', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A15', 'nombre': 'Milanesa Pollo', 'cat': 1, 'precio': 2.0}, {'codigo': 'A16', 'nombre': 'Chorizo o Salchicha', 'cat': 1, 'precio': 2.0},
+      {'codigo': 'A17', 'nombre': 'Chicharrón', 'cat': 1, 'precio': 4.0}, {'codigo': 'B01', 'nombre': 'Quinua', 'cat': 2, 'precio': 2.0},
+      {'codigo': 'B02', 'nombre': 'Maca', 'cat': 2, 'precio': 2.0}, {'codigo': 'B03', 'nombre': '7 Semillas', 'cat': 2, 'precio': 2.0},
+      {'codigo': 'B04', 'nombre': 'Avena Manzana', 'cat': 2, 'precio': 2.0}, {'codigo': 'B05', 'nombre': 'Avena Leche', 'cat': 2, 'precio': 2.0},
+      {'codigo': 'B06', 'nombre': 'Café', 'cat': 2, 'precio': 2.0}, {'codigo': 'B07', 'nombre': 'Café Leche', 'cat': 2, 'precio': 2.0},
+      {'codigo': 'B08', 'nombre': 'Chocolate Leche', 'cat': 2, 'precio': 2.0}, {'codigo': 'C01', 'nombre': 'Chicha', 'cat': 3, 'precio': 2.0},
+      {'codigo': 'C02', 'nombre': 'Maracuyá', 'cat': 3, 'precio': 2.0}, {'codigo': 'C03', 'nombre': 'Piña', 'cat': 3, 'precio': 2.0},
+      {'codigo': 'D01', 'nombre': 'Fresa Leche', 'cat': 4, 'precio': 3.0}, {'codigo': 'D02', 'nombre': 'Papaya', 'cat': 4, 'precio': 2.0},
+      {'codigo': 'D03', 'nombre': 'Mango', 'cat': 4, 'precio': 2.0}, {'codigo': 'E01', 'nombre': 'Ensalada Frutas', 'cat': 5, 'precio': 5.0},
+      {'codigo': 'F01', 'nombre': 'Huevo Sancochado', 'cat': 6, 'precio': 1.0}, {'codigo': 'G01', 'nombre': 'Arroz Chaufa / Pollo', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G02', 'nombre': 'Arroz Chaufa / Cerdo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G03', 'nombre': 'Arroz Chaufa / Lomito', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G04', 'nombre': 'Arroz Chaufa / Cubana', 'cat': 7, 'precio': 5.0}, {'codigo': 'G05', 'nombre': 'Arroz Cubana', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G06', 'nombre': 'Lomo Saltado', 'cat': 7, 'precio': 5.0}, {'codigo': 'G07', 'nombre': 'Arroz Tapado', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G08', 'nombre': 'Arroz con Pollo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G09', 'nombre': 'Arroz con Pollo / Huancaína', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G10', 'nombre': 'Tallarín Rojo Pollo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G11', 'nombre': 'Tallarín Rojo Pollo / Huancaína', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G12', 'nombre': 'Tallarín Rojo Carne', 'cat': 7, 'precio': 5.0}, {'codigo': 'G13', 'nombre': 'Tallarín Rojo Carne Huancaína', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G14', 'nombre': 'Papa Rellena', 'cat': 7, 'precio': 5.0}, {'codigo': 'G15', 'nombre': 'Escabeche Pollo', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G16', 'nombre': 'Escabeche Pescado', 'cat': 7, 'precio': 5.0}, {'codigo': 'G17', 'nombre': 'Estofado Pollo', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G18', 'nombre': 'Estofado Carne', 'cat': 7, 'precio': 5.0}, {'codigo': 'G19', 'nombre': 'Picante Carne', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G20', 'nombre': 'Picante Pollo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G21', 'nombre': 'Milanesa Pollo', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G22', 'nombre': 'Arroz Jardinera Pollo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G23', 'nombre': 'Arroz Jardinera Cerdo', 'cat': 7, 'precio': 5.0},
+      {'codigo': 'G24', 'nombre': 'Seco Pollo', 'cat': 7, 'precio': 5.0}, {'codigo': 'G25', 'nombre': 'Caldo Gallina', 'cat': 7, 'precio': 10.0},
       {'codigo': 'G26', 'nombre': 'Patasca', 'cat': 7, 'precio': 15.0},
     ];
 
     for (var p in productos) {
       int prodId = await db.insert('productos', {'codigo': p['codigo'], 'nombre': p['nombre'], 'categoria_id': p['cat']});
-      for (int pvId in [1, 2, 3, 4]) {
-        await db.insert('precios', {'producto_id': prodId, 'punto_venta_id': pvId, 'precio': p['precio']});
-      }
+      for (int pvId in [1, 2, 3, 4]) { await db.insert('precios', {'producto_id': prodId, 'punto_venta_id': pvId, 'precio': p['precio']}); }
     }
   }
 
   static String calcularHashBatch(Map<String, dynamic> header, List<Map<String, dynamic>> items) {
     final ordenados = items.toList()..sort((a, b) => (a['producto_id'] as int).compareTo(b['producto_id'] as int));
-    final canonico = '${header['serie']}|${header['correlativo']}|${header['origen']}|${header['destino']}|${header['tipo']}|${header['hash_anterior']}|' +
-        ordenados.map((i) => '${i['producto_id']}:${i['cantidad']}').join(',');
+    final canonico = '${header['serie']}|${header['correlativo']}|${header['origen']}|${header['destino']}|${header['tipo']}|${header['hash_anterior']}|' + ordenados.map((i) => '${i['producto_id']}:${i['cantidad']}').join(',');
     return 'sha256:${sha256.convert(utf8.encode(canonico)).toString()}';
   }
 
   Future<Map<String, dynamic>> getSerieInfo(String serie) async {
-    final db = await database;
-    final r = await db.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
+    final r = await (await database).query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
     if (r.isEmpty) return {'ultimo_correlativo': 0, 'ultimo_hash': 'sha256:0000'};
     final row = Map<String, dynamic>.from(r.first);
-    return {
-      'ultimo_correlativo': (row['ultimo_correlativo'] as num?)?.toInt() ?? 0,
-      'ultimo_hash': row['ultimo_hash'] as String? ?? 'sha256:0000',
-    };
+    return {'ultimo_correlativo': (row['ultimo_correlativo'] as num?)?.toInt() ?? 0, 'ultimo_hash': row['ultimo_hash'] as String? ?? 'sha256:0000'};
   }
 
-  Future<String> generarBatchJson({
-    required String tipo,
-    required String origenCodigo,
-    required String destinoCodigo,
-    required String emisorDni,
-    required List<Map<String, dynamic>> items,
-  }) async {
+  Future<String> generarBatchJson({required String tipo, required String origenCodigo, required String destinoCodigo, required String emisorDni, required List<Map<String, dynamic>> items}) async {
     final db = await database;
     final serie = '$origenCodigo-$destinoCodigo';
     final info = await getSerieInfo(serie);
     final correlativo = (info['ultimo_correlativo'] as int) + 1;
     final hashAnterior = info['ultimo_hash'] as String;
     final ahora = DateTime.now().toIso8601String();
-    final periodo = ahora.split('T')[0];
-
-    final header = {
-      'tipo': tipo, 'version': 2, 'serie': serie, 'correlativo': correlativo,
-      'origen': origenCodigo, 'destino': destinoCodigo, 'fecha_generacion': ahora,
-      'emisor_dni': emisorDni, 'hash_anterior': hashAnterior,
-    };
+    final header = {'tipo': tipo, 'version': 2, 'serie': serie, 'correlativo': correlativo, 'origen': origenCodigo, 'destino': destinoCodigo, 'fecha_generacion': ahora, 'emisor_dni': emisorDni, 'hash_anterior': hashAnterior};
     header['hash'] = calcularHashBatch(header, items);
-
-    final payload = {'items': items};
-    final json = jsonEncode({'header': header, 'payload': payload});
-
-    await db.insert('batches_generados', {
-      'tipo': tipo, 'origen': origenCodigo, 'destino': destinoCodigo, 'periodo': periodo,
-      'secuencial': correlativo, 'hash': header['hash'], 'hash_anterior': hashAnterior,
-      'contenido_json': json, 'fecha_generacion': ahora, 'estado': 'GENERADO',
-    });
+    final json = jsonEncode({'header': header, 'payload': {'items': items}});
+    await db.insert('batches_generados', {'tipo': tipo, 'origen': origenCodigo, 'destino': destinoCodigo, 'periodo': ahora.split('T')[0], 'secuencial': correlativo, 'hash': header['hash'], 'hash_anterior': hashAnterior, 'contenido_json': json, 'fecha_generacion': ahora, 'estado': 'GENERADO'});
     return json;
   }
 
   Future<Map<String, dynamic>> validarYRegistrarBatch(String jsonString, int pvIdUsuario) async {
     final db = await database;
     Map<String, dynamic> data;
-    try {
-      data = jsonDecode(jsonString) as Map<String, dynamic>;
-    } catch (e) {
-      return {'ok': false, 'msg': 'Filtro 1 · El JSON está corrupto o no es válido.'};
-    }
-    final header = data['header'] as Map<String, dynamic>?;
-    final payload = data['payload'] as Map<String, dynamic>?;
+    try { data = jsonDecode(jsonString) as Map<String, dynamic>; } catch (e) { return {'ok': false, 'msg': 'Filtro 1 · JSON inválido.'}; }
+    final header = data['header'] as Map<String, dynamic>?; final payload = data['payload'] as Map<String, dynamic>?;
     if (header == null || payload == null) return {'ok': false, 'msg': 'Filtro 1 · Estructura incompleta.'};
-    if ((header['version'] as num?)?.toInt() != 2) return {'ok': false, 'msg': 'Filtro 1 · Versión no soportada (se requiere v2).'};
+    if ((header['version'] as num?)?.toInt() != 2) return {'ok': false, 'msg': 'Filtro 1 · Versión no soportada.'};
 
-    final serie = header['serie'] as String? ?? '';
-    final origen = header['origen'] as String? ?? '';
-    final destino = header['destino'] as String? ?? '';
-    final tipo = header['tipo'] as String? ?? '';
-    final correlativo = (header['correlativo'] as num?)?.toInt() ?? -1;
-    final hashRecibido = header['hash'] as String? ?? '';
-    final hashAnteriorRecibido = header['hash_anterior'] as String? ?? '';
-    final fechaStr = header['fecha_generacion'] as String? ?? '';
+    final serie = header['serie'] as String? ?? ''; final origen = header['origen'] as String? ?? ''; final destino = header['destino'] as String? ?? ''; final tipo = header['tipo'] as String? ?? '';
+    final correlativo = (header['correlativo'] as num?)?.toInt() ?? -1; final hashRecibido = header['hash'] as String? ?? ''; final hashAnteriorRecibido = header['hash_anterior'] as String? ?? ''; final fechaStr = header['fecha_generacion'] as String? ?? '';
 
-    if (serie != '$origen-$destino') return {'ok': false, 'msg': 'Filtro 2 · La serie no coincide con origen-destino.'};
-
+    if (serie != '$origen-$destino') return {'ok': false, 'msg': 'Filtro 2 · Serie no coincide.'};
     final pvRows = await db.query('puntos_venta', where: 'id = ?', whereArgs: [pvIdUsuario]);
-    if (pvRows.isEmpty) return {'ok': false, 'msg': 'Filtro 3 · Tu punto de venta no existe.'};
-    final pvActual = Map<String, dynamic>.from(pvRows.first);
-    if ((pvActual['codigo'] as String?) != destino) return {'ok': false, 'msg': 'Filtro 3 · Este batch es para $destino, no para tu PV.'};
-
+    if (pvRows.isEmpty || (pvRows.first['codigo'] as String?) != destino) return {'ok': false, 'msg': 'Filtro 3 · Destino incorrecto.'};
     final origenRows = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [origen]);
-    if (origenRows.isEmpty) return {'ok': false, 'msg': 'Filtro 4 · El emisor "$origen" no existe.'};
+    if (origenRows.isEmpty) return {'ok': false, 'msg': 'Filtro 4 · Emisor no existe.'};
 
     final fechaGen = DateTime.tryParse(fechaStr);
     if (fechaGen == null) return {'ok': false, 'msg': 'Filtro 5 · Fecha inválida.'};
     final ahora = DateTime.now();
-    if (fechaGen.isAfter(ahora.add(const Duration(minutes: 5)))) return {'ok': false, 'msg': 'Filtro 5 · Fecha futura.'};
-    if (ahora.difference(fechaGen).inHours > 48) return {'ok': false, 'msg': 'Filtro 5 · Batch vencido (>48h).'};
+    if (fechaGen.isAfter(ahora.add(const Duration(minutes: 5))) || ahora.difference(fechaGen).inHours > 48) return {'ok': false, 'msg': 'Filtro 5 · Fecha futura o vencida.'};
 
     final info = await getSerieInfo(serie);
-    final esperado = (info['ultimo_correlativo'] as int) + 1;
-    if (correlativo != esperado) return {'ok': false, 'msg': 'Filtro 6 · Correlativo inválido: se esperaba $esperado, llegó $correlativo.'};
+    if (correlativo != (info['ultimo_correlativo'] as int) + 1) return {'ok': false, 'msg': 'Filtro 6 · Correlativo inválido.'};
     if (hashAnteriorRecibido != (info['ultimo_hash'] as String)) return {'ok': false, 'msg': 'Filtro 7 · Cadena de hash rota.'};
 
     final items = (payload['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     final headerParaHash = Map<String, dynamic>.from(header)..remove('hash');
-    if (calcularHashBatch(headerParaHash, items) != hashRecibido) return {'ok': false, 'msg': 'Filtro 8 · Hash no coincide (contenido alterado).'};
+    if (calcularHashBatch(headerParaHash, items) != hashRecibido) return {'ok': false, 'msg': 'Filtro 8 · Hash no coincide.'};
 
     for (var item in items) {
-      final prodId = (item['producto_id'] as num?)?.toInt();
-      final cantidad = (item['cantidad'] as num?)?.toInt() ?? 0;
-      if (prodId == null || cantidad <= 0) return {'ok': false, 'msg': 'Filtro 9 · Item inválido.'};
-      final prod = await db.query('productos', where: 'id = ? AND activo = 1', whereArgs: [prodId]);
-      if (prod.isEmpty) return {'ok': false, 'msg': 'Filtro 9 · Producto $prodId no existe o está inactivo.'};
+      if ((item['producto_id'] as num?)?.toInt() == null || (item['cantidad'] as num?)?.toInt()! <= 0) return {'ok': false, 'msg': 'Filtro 9 · Item inválido.'};
+      if ((await db.query('productos', where: 'id = ? AND activo = 1', whereArgs: [item['producto_id']])).isEmpty) return {'ok': false, 'msg': 'Filtro 9 · Producto inexistente.'};
     }
 
     final hoy = ahora.toIso8601String().split('T')[0];
     await db.transaction((txn) async {
       for (var item in items) {
-        final prodId = (item['producto_id'] as num).toInt();
-        final cantidad = (item['cantidad'] as num).toInt();
+        final prodId = (item['producto_id'] as num).toInt(); final cantidad = (item['cantidad'] as num).toInt();
         final existente = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, pvIdUsuario, hoy]);
-        if (existente.isEmpty) {
-          await txn.insert('inventario', {'producto_id': prodId, 'punto_venta_id': pvIdUsuario, 'stock': cantidad, 'fecha': hoy});
-        } else {
-          final actual = (existente.first['stock'] as num?)?.toInt() ?? 0;
-          await txn.update('inventario', {'stock': actual + cantidad}, where: 'id = ?', whereArgs: [existente.first['id']]);
-        }
+        if (existente.isEmpty) { await txn.insert('inventario', {'producto_id': prodId, 'punto_venta_id': pvIdUsuario, 'stock': cantidad, 'fecha': hoy}); } 
+        else { await txn.update('inventario', {'stock': (existente.first['stock'] as num).toInt() + cantidad}, where: 'id = ?', whereArgs: [existente.first['id']]); }
       }
       final serieRows = await txn.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
-      if (serieRows.isEmpty) {
-        await txn.insert('batches_serie', {'serie': serie, 'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': ahora.toIso8601String()});
-      } else {
-        await txn.update('batches_serie', {'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': ahora.toIso8601String()}, where: 'serie = ?', whereArgs: [serie]);
-      }
+      if (serieRows.isEmpty) { await txn.insert('batches_serie', {'serie': serie, 'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': ahora.toIso8601String()}); } 
+      else { await txn.update('batches_serie', {'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': ahora.toIso8601String()}, where: 'serie = ?', whereArgs: [serie]); }
       await txn.insert('batches_recibidos', {'tipo': tipo, 'origen': origen, 'destino': destino, 'periodo': hoy, 'secuencial': correlativo, 'hash': hashRecibido, 'hash_anterior': hashAnteriorRecibido, 'contenido_json': jsonString, 'fecha_generacion': fechaStr, 'fecha_recepcion': ahora.toIso8601String(), 'estado': 'RECIBIDO'});
       await txn.insert('auditoria_cambios', {'fecha': ahora.toIso8601String(), 'usuario_id': pvIdUsuario, 'usuario_nombre': 'Sistema', 'tabla_afectada': 'inventario', 'accion': 'BATCH_RECIBIDO', 'registro_id': correlativo, 'datos_anteriores': 'serie=$serie hash_anterior=$hashAnteriorRecibido', 'datos_nuevos': 'serie=$serie correlativo=$correlativo hash=$hashRecibido items=${items.length}'});
     });
-    return {'ok': true, 'msg': 'Batch $serie #$correlativo recibido · ${items.length} productos cargados.'};
+    return {'ok': true, 'msg': 'Batch $serie #$correlativo recibido · ${items.length} productos.'};
   }
-
-  // =========================================================================
-  // MÉTODOS CRUD RECONSTRUIDOS Y COMPLETOS
-  // =========================================================================
-
+  // --- MÉTODOS CRUD Y UTILIDADES ---
   Future<int> insertar(String tabla, Map<String, dynamic> data) async => (await database).insert(tabla, data);
-  
   Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async => (await database).query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
-  
   Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? arguments]) async => (await database).rawQuery(sql, arguments);
-
+  
   Future<int> actualizar(String tabla, Map<String, dynamic> data, {String? where, List<Object?>? whereArgs}) async {
     final db = await database;
-    if (where == null && data.containsKey('id')) {
-      return await db.update(tabla, data, where: 'id = ?', whereArgs: [data['id']]);
-    }
+    if (where == null && data.containsKey('id')) return await db.update(tabla, data, where: 'id = ?', whereArgs: [data['id']]);
     return await db.update(tabla, data, where: where, whereArgs: whereArgs);
   }
 
-  Future<int> eliminar(String tabla, int id) async {
-    final db = await database;
-    return await db.delete(tabla, where: 'id = ?', whereArgs: [id]);
-  }
+  Future<int> eliminar(String tabla, int id) async => (await database).delete(tabla, where: 'id = ?', whereArgs: [id]);
 
   Future<String?> getParametro(String clave) async {
-    final db = await database;
-    final res = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]);
-    if (res.isNotEmpty) return res.first['valor'] as String?;
-    return null;
+    final res = await (await database).query('parametros', where: 'clave = ?', whereArgs: [clave]);
+    return res.isNotEmpty ? res.first['valor'] as String? : null;
   }
 
   Future<void> setParametro(String clave, String valor, {String? descripcion}) async {
+    await (await database).insert('parametros', {'clave': clave, 'valor': valor, 'descripcion': descripcion ?? 'Actualizado desde app'}, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getCategoriasGasto() async => (await database).query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC');
+  Future<int> reactivarProducto(int id) async => (await database).update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [id]);
+  Future<int> eliminarProductoLogico(int id) async => (await database).update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [id]);
+  Future<List<Map<String, dynamic>>> getPreciosDeProducto(int productoId) async => (await database).query('precios', where: 'producto_id = ?', whereArgs: [productoId]);
+
+  Future<void> insertarProductoConPrecios(Map<String, dynamic> producto, List<Map<String, dynamic>> precios) async {
     final db = await database;
-    await db.insert('parametros', {
-      'clave': clave,
-      'valor': valor,
-      'descripcion': descripcion ?? 'Actualizado desde app
+    await db.transaction((txn) async {
+      final prodId = await txn.insert('productos', producto);
+      for (var precio in precios) { precio['producto_id'] = prodId; await txn.insert('precios', precio); }
+    });
+  }
+
+  Future<void> actualizarProductoConPrecios(int productoId, Map<String, dynamic> producto, List<Map<String, dynamic>> precios) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.update('productos', producto, where: 'id = ?', whereArgs: [productoId]);
+      await txn.delete('precios', where: 'producto_id = ?', whereArgs: [productoId]);
+      for (var precio in precios) { precio['producto_id'] = productoId; await txn.insert('precios', precio); }
+    });
+  }
+
+  Future<int> registrarGasto(Map<String, dynamic> data) async => (await database).insert('gastos_internos', data);
+  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async => (await database).query('cuentas_por_cobrar', where: "estado = 'PENDIENTE'", orderBy: 'fecha_vencimiento ASC');
+
+  Future<Map<String, dynamic>> getResumenMensual() async {
+    final db = await database;
+    final v = await db.rawQuery('SELECT SUM(monto_total) as total FROM ventas');
+    final g = await db.rawQuery('SELECT SUM(monto) as total FROM gastos_internos');
+    final tv = (v.first['total'] as num?)?.toDouble() ?? 0.0;
+    final tg = (g.first['total'] as num?)?.toDouble() ?? 0.0;
+    return {'total_ventas': tv, 'total_gastos': tg, 'rentabilidad': tv - tg};
+  }
+
+  Future<List<Map<String, dynamic>>> getProductos() async => (await database).rawQuery('SELECT p.*, c.nombre as categoria_nombre, c.abreviatura as categoria_abrev FROM productos p LEFT JOIN categorias_producto c ON p.categoria_id = c.id ORDER BY p.codigo ASC');
+  Future<List<Map<String, dynamic>>> getCategoriasProducto() async => (await database).query('categorias_producto', where: 'activo = 1', orderBy: 'orden ASC, id ASC');
+  Future<List<Map<String, dynamic>>> getPuntosVenta() async => (await database).query('puntos_venta', orderBy: 'id ASC');
+  Future<void> _loadCache() async { final db = await database; notifyListeners(); }
+  
+  Future<int> registrarClienteSiNoExiste(String nombre, String fono, String dni) async {
+    final db = await database;
+    final existe = await db.query('clientes', where: 'dni = ? OR fono = ?', whereArgs: [dni, fono]);
+    if (existe.isNotEmpty) return existe.first['id'] as int;
+    return await db.insert('clientes', {'nombre': nombre, 'fono': fono, 'dni': dni, 'activo': 1});
+  }
+
+  Future<void> registrarVenta(Map<String, dynamic> ventaData, List<Map<String, dynamic>> items, {bool esCredito = false}) async {
+    final db = await database;
+    double total = (ventaData['monto_total'] as num).toDouble();
+    ventaData['base_imponible'] = double.parse((total / 1.18).toStringAsFixed(2));
+    ventaData['igv'] = double.parse((total - ventaData['base_imponible']).toStringAsFixed(2));
+    ventaData['estado_comanda'] = 'PENDIENTE';
+    await db.transaction((txn) async {
+      int ventaId = await txn.insert('ventas', ventaData);
+      for (var item in items) {
+        await txn.insert('detalle_venta', {'venta_id': ventaId, 'producto_id': item['id'], 'cantidad': item['qty'], 'precio_unitario': item['price'], 'subtotal': item['qty'] * item['price']});
+        final hoy = DateTime.now().toIso8601String().split('T')[0];
+        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [item['id'], ventaData['punto_venta_id'], hoy]);
+        if (existeInv.isEmpty) { await txn.insert('inventario', {'producto_id': item['id'], 'punto_venta_id': ventaData['punto_venta_id'], 'stock': -(item['qty'] as int), 'fecha': hoy}); } 
+        else { await txn.rawUpdate('UPDATE inventario SET stock = stock - ? WHERE producto_id = ? AND punto_venta_id = ? AND fecha = ?', [item['qty'], item['id'], ventaData['punto_venta_id'], hoy]); }
+      }
+      if (esCredito) {
+        await txn.insert('cuentas_por_cobrar', {'venta_id': ventaId, 'cliente_id': ventaData['cliente_id'], 'cliente_nombre': ventaData['nombre_cliente'], 'cliente_telefono': ventaData['telefono_cliente'], 'monto_original': ventaData['monto_total'], 'monto_pagado': 0.0, 'saldo_pendiente': ventaData['monto_total'], 'fecha_venta': ventaData['fecha'], 'fecha_vencimiento': DateTime.now().add(Duration(days: 7)).toIso8601String(), 'estado': 'PENDIENTE', 'punto_venta_id': ventaData['punto_venta_id']});
+      }
+    });
+  }
+  
+  Future<List<Map<String, dynamic>>> consultarCierresDelDia(String fecha) async => (await database).rawQuery('SELECT c.*, pv.codigo as pv_codigo, pv.nombre as pv_nombre FROM cierres_caja c LEFT JOIN puntos_venta pv ON c.punto_venta_id = pv.id WHERE c.fecha = ? ORDER BY pv.id', [fecha]);
+}
