@@ -60,7 +60,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (mounted) setState(() { _resumenPorPv = resumen; _totalVentas = suma; _totalGastos = tg; _totalQuiebres = tq; _cargando = false; });
   }
 
-  void _navegar(Widget p) async { await Navigator.push(context, MaterialPageRoute(builder: (_) => p)); _cargar(); }
+  void _navegar(Widget p) async { 
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => p)); 
+    _cargar(); 
+  }
 
   void _confirmarLogout() {
     showDialog(
@@ -190,14 +193,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   crossAxisSpacing: 8,
                   childAspectRatio: 2.5,
                   children: [
-                    _botonAccionCompacto('ACTIVAR VENDEDOR', Icons.play_circle_fill, _orange, () => _navegar(const AdminActivarVendedorScreen())),
-                    _botonAccionCompacto('GENERAR BATCH', Icons.send, _amber, () => _navegar(const AdminGenerarBatchScreen())),
-                    _botonAccionCompacto('IMPORTAR VENTAS', Icons.upload_file, _amber, () => _navegar(const AdminImportarDbScreen())),
-                    _botonAccionCompacto('MANTENIMIENTO', Icons.build, Colors.blue, () => _navegar(const MantenimientoMenuScreen())),
-                    _botonAccionCompacto('BACKUP SISTEMA', Icons.cloud_upload, _green, () => _navegar(const AdminBackupScreen())),
-                    _botonAccionCompacto('CUENTAS X COBRAR', Icons.monetization_on, _orange, () => _navegar(const CxcScreen())),
-                    _botonAccionCompacto('RENTABILIDAD', Icons.trending_up, _green, () => _navegar(const RentabilidadScreen())),
-                    _botonAccionCompacto('REGISTRAR GASTO', Icons.shopping_cart, _red, () => _navegar(const CompraScreen())),
+                    // AQUI SE QUITÓ EL 'const' DE TODAS LAS PANTALLAS
+                    _botonAccionCompacto('ACTIVAR VENDEDOR', Icons.play_circle_fill, _orange, () => _navegar(AdminActivarVendedorScreen())),
+                    _botonAccionCompacto('GENERAR BATCH', Icons.send, _amber, () => _navegar(AdminGenerarBatchScreen())),
+                    _botonAccionCompacto('IMPORTAR VENTAS', Icons.upload_file, _amber, () => _navegar(AdminImportarDbScreen())),
+                    _botonAccionCompacto('MANTENIMIENTO', Icons.build, Colors.blue, () => _navegar(MantenimientoMenuScreen())),
+                    _botonAccionCompacto('BACKUP SISTEMA', Icons.cloud_upload, _green, () => _navegar(AdminBackupScreen())),
+                    _botonAccionCompacto('CUENTAS X COBRAR', Icons.monetization_on, _orange, () => _navegar(CxcScreen())),
+                    _botonAccionCompacto('RENTABILIDAD', Icons.trending_up, _green, () => _navegar(RentabilidadScreen())),
+                    _botonAccionCompacto('REGISTRAR GASTO', Icons.shopping_cart, _red, () => _navegar(CompraScreen())),
                   ],
                 ),
 
