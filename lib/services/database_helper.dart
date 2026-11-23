@@ -486,3 +486,38 @@ class DatabaseHelper extends ChangeNotifier {
       }
       if (esCredito) {
         await txn.insert('cuentas_por_cobrar', {
+'venta_id': idVenta, // 1. Vinculamos este cobro con la venta realizada.
+            'cliente_id': datosVenta['cliente_id'], // 2. ID del cliente que debe.
+            'cliente_nombre': datosVenta['nombre_cliente'] ?? 'Cliente General', // 3. Nombre del cliente (con valor por defecto).
+            'cliente_telefono': datosVenta['telefono_cliente'] ?? '', // 4. Teléfono del cliente.
+            'monto_original': montoTotal, // 5. Monto total original de la deuda.
+            'monto_pagado': 0.0, // 6. Al inicio, no se ha pagado nada.
+            'saldo_pendiente': montoTotal, // 7. La deuda inicial es igual al monto total.
+            'fecha_venta': datosVenta['fecha'], // 8. Fecha en que se hizo la venta.
+            'fecha_vencimiento': datosVenta['fecha_vencimiento'] ?? datosVenta['fecha'], // 9. Fecha límite de pago.
+            'estado': 'PENDIENTE', // 10. Estado inicial de la cuenta por cobrar.
+            'punto_venta_id': datosVenta['punto_venta_id'], // 11. Punto de venta donde se generó la deuda.
+            'observaciones': 'Venta a crédito registrada desde la app' // 12. Nota aclaratoria.
+          });
+        }
+      }); // 13. ¡Cierre de la transacción de la base de datos!
+    } // 14. ¡Cierre del método registrarVenta!
+
+    // 15. Método corregido para que coincida con lo que espera la pantalla de Rentabilidad.
+    Future<Map<String, dynamic>> getResumenMensual() async {
+      final db = await database; // 16. Obtenemos la instancia de la base de datos.
+      // 17. Consultamos la suma total de ventas.
+      final ventas = await db.rawQuery('SELECT SUM(monto_total) AS total FROM ventas'); 
+      // 18. Consultamos la suma total de gastos.
+      final gastos = await db.rawQuery('SELECT SUM(monto) AS total FROM gastos_internos'); 
+      // 19. Extraemos el valor numérico o usamos 0.0 si es nulo.
+      final totalVentas = (ventas.first['total'] as num?)?.toDouble() ?? 0.0; 
+      final totalGastos = (gastos.first['total'] as num?)?.toDouble() ?? 0.0; 
+      // 20. Retornamos un Mapa con las claves exactas que la UI espera ('ventas', 'gastos', 'utilidad').
+      return {
+        'ventas': totalVentas, 
+        'gastos': totalGastos, 
+        'utilidad': totalVentas - totalGastos
+      };
+    }
+  } // 21. ¡CIERRE FINAL DE LA CLASE DatabaseHelper! (Esto faltaba y causaba los errores)
