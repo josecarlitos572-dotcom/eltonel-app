@@ -21,12 +21,8 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
   String get _hoy => DateTime.now().toIso8601String().split('T')[0];
 
-  // REM: FASE 1 - Números de WhatsApp. Cambia estos por los reales de tus vendedores.
-  final Map<String, String> _whatsappMap = {
-    'SR1': '51988888888', 
-    'VR1': '51977777777', 
-    'VR2': '51966666666', 
-  };
+  // REM: FASE 1 - CONSULTA AUTOMÁTICA - Eliminado el mapa hardcoded _whatsappMap
+  // Ahora el número se consulta automáticamente desde la BD (tabla personal)
 
   @override
   void initState() {
@@ -118,6 +114,22 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
       final pvCodigo = pvDestino['codigo'] as String;
       final pvNombre = pvDestino['nombre'] as String;
 
+      // REM: FASE 1 - CONSULTA AUTOMÁTICA - Obtener el fono del vendedor activo asignado al PV
+      final numeroWsp = await db.getWhatsappVendedorActivo(_pvDestinoId);
+      
+      if (numeroWsp == null || numeroWsp.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ No hay vendedor activo con fono registrado en este PV. Actualiza en Mantenimiento → Personal'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() => _cargando = false);
+        return;
+      }
+
       // REM: FASE 1 - Usamos el método oficial del helper (garantiza version: 2 y hash correcto)
       final jsonStr = await db.generarBatchJson(
         tipo: _tipo,
@@ -145,8 +157,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
           '✅ *Para recibir, abre la app y presiona "Recibir Entrada"*';
 
-      // REM: FASE 1 - Abrir WhatsApp automáticamente
-      final numeroWsp = _whatsappMap[pvCodigo] ?? '';
+      // REM: FASE 1 - Abrir WhatsApp automáticamente con el número consultado de la BD
       final uri = Uri.parse('https://wa.me/$numeroWsp?text=${Uri.encodeComponent(mensajeWsp)}');
       
       if (await canLaunchUrl(uri)) {
@@ -155,7 +166,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Batch generado y WhatsApp abierto para $pvNombre'),
+              content: Text('✅ Batch generado y enviado a $pvNombre ($numeroWsp)'),
               backgroundColor: Colors.green,
             ),
           );
