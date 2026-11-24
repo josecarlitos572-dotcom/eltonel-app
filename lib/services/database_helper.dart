@@ -149,258 +149,74 @@ class DatabaseHelper extends ChangeNotifier {
       }
     }
   }
-static String calcularHashBatch(Map<String, dynamic> header, List<Map<String, dynamic>> items) {
-    final ordenados = items.toList()..sort((a, b) => (a['producto_id'] as int).compareTo(b['producto_id'] as int));
-    final canonico = '${header['serie']}|${header['correlativo']}|${header['origen']}|${header['destino']}|${header['tipo']}|${header['hash_anterior']}|' +
-        ordenados.map((i) => '${i['producto_id']}:${i['cantidad']}').join('|');
-    return 'sha256:${sha256.convert(utf8.encode(canonico)).toString()}';
-  }
-
-  Future<Map<String, dynamic>> getSerieInfo(String serie) async {
-    final res = await database;
-    final r = await res.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
-    if (r.isEmpty) return {'ultimo_correlativo': 0, 'ultimo_hash': 'sha256:0000'};
-    final row = Map<String, dynamic>.from(r.first);
-    return {
-      'ultimo_correlativo': (row['ultimo_correlativo'] as num?)?.toInt() ?? 0,
-      'ultimo_hash': row['ultimo_hash'] as String? ?? 'sha256:0000'
-    };
-  }
-
-  // REM: FASE 2 - MÉTODO MODIFICADO - Genera el batch e incluye la config automáticamente
-  Future<String> generarBatchJson({
-    required String tipo,
-    required String origenCodigo,
-    required String destinoCodigo,
-    required String dniEmisor,
-    required List<Map<String, dynamic>> items,
-  }) async {
-    final db = await database;
-    final serie = '$origenCodigo-$destinoCodigo';
-    final infoSerie = await getSerieInfo(serie);
-    final correlativo = infoSerie['ultimo_correlativo'] + 1;
-    final hashAnterior = infoSerie['ultimo_hash'];
-    final fecha = DateTime.now().toIso8601String();
-
-    final header = {
-      'tipo': tipo, 'version': 2, 'serie': serie, 'correlativo': correlativo,
-      'origen': origenCodigo, 'destino': destinoCodigo, 'fecha_generacion': fecha,
-      'emisor_dni': dniEmisor, 'hash_anterior': hashAnterior
-    };
-
-    // REM: FASE 2 - AUTOMÁTICO - Construir payload con config incluida
-    final payload = <String, dynamic>{'items': items};
-    
-    // REM: FASE 2 - Incluir configuración del PV destino automáticamente
-    final pvDestino = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [destinoCodigo]);
-    if (pvDestino.isNotEmpty) {
-      final pvId = pvDestino.first['id'] as int;
-      
-      payload['config'] = {
-        'personal': await db.query('personal', where: 'punto_venta_id = ? AND activo = 1', whereArgs: [pvId]),
-        'productos': await db.query('productos', where: 'activo = 1'),
-        'precios': await db.query('precios', where: 'punto_venta_id = ?', whereArgs: [pvId]),
-        'categorias_producto': await db.query('categorias_producto', where: 'activo = 1'),
-        'parametros': await db.query('parametros'),
-        'puntos_venta': await db.query('puntos_venta', where: 'activo = 1'),
-      };
-    }
-
-    header['hash'] = calcularHashBatch(header, items);
-    final jsonFinal = jsonEncode({'header': header, 'payload': payload});
-
-    await db.insert('batches_generados', {
-      'tipo': tipo, 'origen': origenCodigo, 'destino': destinoCodigo,
-      'periodo': fecha.split('T')[0], 'secuencial': correlativo, 'hash': header['hash'],
-      'hash_anterior': hashAnterior, 'contenido_json': jsonFinal,
-      'fecha_generacion': fecha, 'estado': 'GENERADO'
-    });
-    return jsonFinal;
-  }
-
-  // REM: FASE 2 - MÉTODO MODIFICADO - Valida y registra el batch, procesando la config incluida
-  Future<Map<String, dynamic>> validarYRegistrarBatch(String jsonString, int idPuntoVentaUsuario) async {
-    final db = await database;
-    Map<String, dynamic> data;
-    try { data = jsonDecode(jsonString) as Map<String, dynamic>; } 
-    catch (e) { return {'ok': false, 'msg': 'Filtro 1: JSON inválido'}; }
-    
-    final header = data['header'] as Map<String, dynamic>?;
-    final payload = data['payload'] as Map<String, dynamic>?;
-    if (header == null || payload == null) return {'ok': false, 'msg': 'Filtro 1: Estructura incompleta'};
-    if ((header['version'] as num?)?.toInt() != 2) return {'ok': false, 'msg': 'Filtro1: Versión no soportada'};
-
-    final serie = header['serie'] as String? ?? '';
-    final origen = header['origen'] as String? ?? '';
-    final destino = header['destino'] as String? ?? '';
-    final correlativo = (header['correlativo'] as num?)?.toInt() ?? -1;
-    final hashRecibido = header['hash'] as String? ?? '';
-    final hashAnteriorRecibido = header['hash_anterior'] as String? ?? '';
-    final fechaStr = header['fecha_generacion'] as String? ?? '';
-
-    if (serie != '$origen-$destino') return {'ok': false, 'msg': 'Filtro2: Serie no coincide'};
-    final pvUsuario = await db.query('puntos_venta', where: 'id = ?', whereArgs: [idPuntoVentaUsuario]);
-    if (pvUsuario.isEmpty || (pvUsuario.first['codigo'] as String?) != destino) return {'ok': false, 'msg': 'Filtro3: Destino incorrecto'};
-    final pvOrigen = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [origen]);
-    if (pvOrigen.isEmpty) return {'ok': false, 'msg': 'Filtro4: Origen no existe'};
-
-    final fechaParseada = DateTime.tryParse(fechaStr);
-    if (fechaParseada == null) return {'ok': false, 'msg': 'Filtro5: Fecha inválida'};
-    final ahora = DateTime.now();
-    if (fechaParseada.isAfter(ahora.add(const Duration(minutes: 5))) || ahora.difference(fechaParseada).inHours > 48) {
-      return {'ok': false, 'msg': 'Filtro5: Fecha fuera de rango'};
-    }
-
-    final infoSerie = await getSerieInfo(serie);
-    if (correlativo != infoSerie['ultimo_correlativo'] + 1) return {'ok': false, 'msg': 'Filtro6: Correlativo desordenado'};
-    if (hashAnteriorRecibido != infoSerie['ultimo_hash']) return {'ok': false, 'msg': 'Filtro7: Hash anterior no coincide'};
-
-    final items = (payload['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)).toList();
-    final headerParaHash = Map<String, dynamic>.from(header)..remove('hash');
-    if (calcularHashBatch(headerParaHash, items) != hashRecibido) return {'ok': false, 'msg': 'Filtro8: Hash de integridad falló'};
-
-    for (var item in items) {
-      final prodId = (item['producto_id'] as num?)?.toInt();
-      final cantidad = (item['cantidad'] as num?)?.toInt();
-      if (prodId == null || cantidad == null || cantidad <= 0) return {'ok': false, 'msg': 'Filtro9: Item inválido'};
-      final prodExiste = await db.query('productos', where: 'id = ? AND activo = 1', whereArgs: [prodId]);
-      if (prodExiste.isEmpty) return {'ok': false, 'msg': 'Filtro9: Producto no existe'};
-    }
-
-    final fechaHoy = DateTime.now().toIso8601String().split('T')[0];
-    await db.transaction((txn) async {
-      for (var item in items) {
-        final prodId = (item['producto_id'] as num).toInt();
-        final cantidad = (item['cantidad'] as num).toInt();
-        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
-        if (existeInv.isEmpty) {
-          await txn.insert('inventario', {'producto_id': prodId, 'punto_venta_id': idPuntoVentaUsuario, 'stock': cantidad, 'fecha': fechaHoy});
-        } else {
-          final stockActual = (existeInv.first['stock'] as num).toInt();
-          await txn.update('inventario', {'stock': stockActual + cantidad}, where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
-        }
-      }
-      await txn.update('batches_serie', {'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': DateTime.now().toIso8601String()}, where: 'serie = ?', whereArgs: [serie]);
-      await txn.insert('batches_recibidos', {
-        'tipo': header['tipo'], 'origen': origen, 'destino': destino, 'periodo': fechaHoy, 'secuencial': correlativo,
-        'hash': hashRecibido, 'hash_anterior': hashAnteriorRecibido, 'contenido_json': jsonString,
-        'fecha_generacion': fechaStr, 'fecha_recepcion': DateTime.now().toIso8601String(), 'estado': 'RECIBIDO'
-      });
-
-      // REM: FASE 2 - AUTOMÁTICO - Procesar configuración incluida en el batch
-      final config = payload['config'] as Map<String, dynamic>?;
-      if (config != null) {
-        if (config['personal'] != null) {
-          for (var p in config['personal'] as List) {
-            await txn.insert('personal', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-        if (config['productos'] != null) {
-          for (var p in config['productos'] as List) {
-            await txn.insert('productos', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-        if (config['precios'] != null) {
-          for (var p in config['precios'] as List) {
-            await txn.insert('precios', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-        if (config['categorias_producto'] != null) {
-          for (var c in config['categorias_producto'] as List) {
-            await txn.insert('categorias_producto', Map<String, dynamic>.from(c), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-        if (config['parametros'] != null) {
-          for (var p in config['parametros'] as List) {
-            await txn.insert('parametros', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-        if (config['puntos_venta'] != null) {
-          for (var p in config['puntos_venta'] as List) {
-            await txn.insert('puntos_venta', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        }
-      }
-    });
-    return {'ok': true, 'msg': 'Batch $serie #$correlativo registrado, ${items.length} productos, config actualizada'};
-  }
-
-  // REM: FASE 1 - CONSULTA AUTOMÁTICA - Método para obtener el WhatsApp del vendedor activo asignado al PV
-  Future<String?> getWhatsappVendedorActivo(int puntoVentaId) async {
-    final db = await database;
-    final personal = await db.query(
-      'personal',
-      where: 'punto_venta_id = ? AND activo = 1 AND rol = ?',
-      whereArgs: [puntoVentaId, 'VENDEDOR'],
-      limit: 1,
-    );
-    if (personal.isEmpty) return null;
-    return personal.first['fono'] as String?;
-  }
 Future<void> _loadCache() async {}
-  
-  Future<int> insertar(String tabla, Map<String, dynamic> datos) async { 
-    final db = await database; 
-    return await db.insert(tabla, datos); 
+
+  // REM: HELPERS BÁSICOS
+  Future<int> insertar(String tabla, Map<String, dynamic> datos) async {
+    final db = await database;
+    return await db.insert(tabla, datos);
   }
-  
-  Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async { 
-    final db = await database; 
-    return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy); 
+
+  Future<List<Map<String, dynamic>>> consultar(String tabla, {String? where, List<Object?>? whereArgs, String? orderBy}) async {
+    final db = await database;
+    return await db.query(tabla, where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
-  
-  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? args]) async { 
-    final db = await database; 
-    return await db.rawQuery(sql, args); 
+
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? args]) async {
+    final db = await database;
+    return await db.rawQuery(sql, args);
   }
-  
+
   Future<int> actualizar(String tabla, Map<String, dynamic> datos, {String? where, List<Object?>? whereArgs}) async {
     final db = await database;
     if (where == null && datos.containsKey('id')) return await db.update(tabla, datos, where: 'id = ?', whereArgs: [datos['id']]);
     return await db.update(tabla, datos, where: where, whereArgs: whereArgs);
   }
-  
-  Future<int> eliminar(String tabla, int id) async { 
-    final db = await database; 
-    return await db.delete(tabla, where: 'id = ?', whereArgs: [id]); 
+
+  Future<int> eliminar(String tabla, int id) async {
+    final db = await database;
+    return await db.delete(tabla, where: 'id = ?', whereArgs: [id]);
   }
-  
-  Future<String?> getParametro(String clave) async { 
-    final db = await database; 
-    final res = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]); 
-    return res.isNotEmpty ? res.first['valor'] as String? : null; 
+
+  Future<String?> getParametro(String clave) async {
+    final db = await database;
+    final res = await db.query('parametros', where: 'clave = ?', whereArgs: [clave]);
+    return res.isNotEmpty ? res.first['valor'] as String? : null;
   }
-  
-  Future<void> setParametro(String clave, String valor, {String? descripcion}) async { 
-    final db = await database; 
-    await db.insert('parametros', {'clave': clave, 'valor': valor, 'descripcion': descripcion ?? 'Actualizado desde app'}, conflictAlgorithm: ConflictAlgorithm.replace); 
+
+  Future<void> setParametro(String clave, String valor, {String? descripcion}) async {
+    final db = await database;
+    await db.insert('parametros', {'clave': clave, 'valor': valor, 'descripcion': descripcion ?? 'Actualizado desde app'}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
-  
-  Future<List<Map<String, dynamic>>> getCategoriasGasto() async { 
-    final db = await database; 
-    return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC'); 
+
+  Future<List<Map<String, dynamic>>> getCategoriasGasto() async {
+    final db = await database;
+    return await db.query('categorias_gasto', where: 'activo = 1', orderBy: 'id ASC');
   }
-  
-  Future<int> reactivarProducto(int id) async { 
-    final db = await database; 
-    return await db.update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [id]); 
+
+  Future<int> reactivarProducto(int id) async {
+    final db = await database;
+    return await db.update('productos', {'activo': 1}, where: 'id = ?', whereArgs: [id]);
   }
-  
-  Future<int> eliminarProductoLogico(int id) async { 
-    final db = await database; 
-    return await db.update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [id]); 
+
+  Future<int> eliminarProductoLogico(int id) async {
+    final db = await database;
+    return await db.update('productos', {'activo': 0}, where: 'id = ?', whereArgs: [id]);
   }
-  
-  Future<List<Map<String, dynamic>>> getPreciosProducto(int productoId) async { 
-    final db = await database; 
-    return await db.query('precios', where: 'producto_id = ?', whereArgs: [productoId]); 
+
+  Future<List<Map<String, dynamic>>> getPreciosProducto(int productoId) async {
+    final db = await database;
+    return await db.query('precios', where: 'producto_id = ?', whereArgs: [productoId]);
   }
-  
+
   Future<void> insertarProductoConPrecios(Map<String, dynamic> producto, List<Map<String, dynamic>> listaPrecios) async {
     final db = await database;
     await db.transaction((txn) async {
       final prodId = await txn.insert('productos', producto);
-      for (var precio in listaPrecios) { precio['producto_id'] = prodId; await txn.insert('precios', precio); }
+      for (var precio in listaPrecios) {
+        precio['producto_id'] = prodId;
+        await txn.insert('precios', precio);
+      }
     });
   }
 
@@ -409,20 +225,23 @@ Future<void> _loadCache() async {}
     await db.transaction((txn) async {
       await txn.update('productos', producto, where: 'id = ?', whereArgs: [productoId]);
       await txn.delete('precios', where: 'producto_id = ?', whereArgs: [productoId]);
-      for (var precio in listaPrecios) { precio['producto_id'] = productoId; await txn.insert('precios', precio); }
+      for (var precio in listaPrecios) {
+        precio['producto_id'] = productoId;
+        await txn.insert('precios', precio);
+      }
     });
   }
 
-  Future<int> registrarGasto(Map<String, dynamic> datosGasto) async { 
-    final db = await database; 
-    return await db.insert('gastos_internos', datosGasto); 
+  Future<int> registrarGasto(Map<String, dynamic> datosGasto) async {
+    final db = await database;
+    return await db.insert('gastos_internos', datosGasto);
   }
-  
-  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async { 
-    final db = await database; 
-    return await db.query('cuentas_por_cobrar', where: "estado = 'PENDIENTE'", orderBy: 'fecha_vencimiento ASC'); 
+
+  Future<List<Map<String, dynamic>>> consultarCuentasPendientes() async {
+    final db = await database;
+    return await db.query('cuentas_por_cobrar', where: "estado = 'PENDIENTE'", orderBy: 'fecha_vencimiento ASC');
   }
-  
+
   Future<Map<String, dynamic>> getResumenMensual() async {
     final db = await database;
     final ventas = await db.rawQuery('SELECT SUM(monto_total) AS total FROM ventas');
@@ -510,5 +329,197 @@ Future<void> _loadCache() async {}
         });
       }
     });
+  }
+
+  // REM: LÓGICA DE BATCHES (SIN FILTROS DE ACTIVO PARA PRUEBAS)
+  static String calcularHashBatch(Map<String, dynamic> header, List<Map<String, dynamic>> items) {
+    final ordenados = items.toList()..sort((a, b) => (a['producto_id'] as int).compareTo(b['producto_id'] as int));
+    final canonico = '${header['serie']}|${header['correlativo']}|${header['origen']}|${header['destino']}|${header['tipo']}|${header['hash_anterior']}|' +
+        ordenados.map((i) => '${i['producto_id']}:${i['cantidad']}').join('|');
+    return 'sha256:${sha256.convert(utf8.encode(canonico)).toString()}';
+  }
+
+  Future<Map<String, dynamic>> getSerieInfo(String serie) async {
+    final res = await database;
+    final r = await res.query('batches_serie', where: 'serie = ?', whereArgs: [serie]);
+    if (r.isEmpty) return {'ultimo_correlativo': 0, 'ultimo_hash': 'sha256:0000'};
+    final row = Map<String, dynamic>.from(r.first);
+    return {
+      'ultimo_correlativo': (row['ultimo_correlativo'] as num?)?.toInt() ?? 0,
+      'ultimo_hash': row['ultimo_hash'] as String? ?? 'sha256:0000'
+    };
+  }
+
+  // REM: SIN FILTROS - Consulta el fono del vendedor asignado al PV
+  Future<String?> getWhatsappVendedorActivo(int puntoVentaId) async {
+    final db = await database;
+    final personal = await db.query(
+      'personal',
+      where: 'punto_venta_id = ? AND rol = ?',
+      whereArgs: [puntoVentaId, 'VENDEDOR'],
+      limit: 1,
+    );
+    if (personal.isEmpty) return null;
+    return personal.first['fono'] as String?;
+  }
+
+  // REM: SIN FILTROS - Genera el batch e incluye la config automáticamente
+  Future<String> generarBatchJson({
+    required String tipo,
+    required String origenCodigo,
+    required String destinoCodigo,
+    required String dniEmisor,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final db = await database;
+    final serie = '$origenCodigo-$destinoCodigo';
+    final infoSerie = await getSerieInfo(serie);
+    final correlativo = infoSerie['ultimo_correlativo'] + 1;
+    final hashAnterior = infoSerie['ultimo_hash'];
+    final fecha = DateTime.now().toIso8601String();
+
+    final header = {
+      'tipo': tipo, 'version': 2, 'serie': serie, 'correlativo': correlativo,
+      'origen': origenCodigo, 'destino': destinoCodigo, 'fecha_generacion': fecha,
+      'emisor_dni': dniEmisor, 'hash_anterior': hashAnterior
+    };
+
+    final payload = <String, dynamic>{'items': items};
+    
+    // REM: SIN FILTROS - Incluir TODA la config del PV destino
+    final pvDestino = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [destinoCodigo]);
+    if (pvDestino.isNotEmpty) {
+      final pvId = pvDestino.first['id'] as int;
+      
+      payload['config'] = {
+        'personal': await db.query('personal', where: 'punto_venta_id = ?', whereArgs: [pvId]),
+        'productos': await db.query('productos'),
+        'precios': await db.query('precios', where: 'punto_venta_id = ?', whereArgs: [pvId]),
+        'categorias_producto': await db.query('categorias_producto'),
+        'parametros': await db.query('parametros'),
+        'puntos_venta': await db.query('puntos_venta'),
+      };
+    }
+
+    header['hash'] = calcularHashBatch(header, items);
+    final jsonFinal = jsonEncode({'header': header, 'payload': payload});
+
+    await db.insert('batches_generados', {
+      'tipo': tipo, 'origen': origenCodigo, 'destino': destinoCodigo,
+      'periodo': fecha.split('T')[0], 'secuencial': correlativo, 'hash': header['hash'],
+      'hash_anterior': hashAnterior, 'contenido_json': jsonFinal,
+      'fecha_generacion': fecha, 'estado': 'GENERADO'
+    });
+    return jsonFinal;
+  }
+// REM: SIN FILTROS - Valida y registra el batch, procesando la config incluida
+  Future<Map<String, dynamic>> validarYRegistrarBatch(String jsonString, int idPuntoVentaUsuario) async {
+    final db = await database;
+    Map<String, dynamic> data;
+    try { 
+      data = jsonDecode(jsonString) as Map<String, dynamic>; 
+    } catch (e) { 
+      return {'ok': false, 'msg': 'Filtro 1: JSON inválido'}; 
+    }
+    
+    final header = data['header'] as Map<String, dynamic>?;
+    final payload = data['payload'] as Map<String, dynamic>?;
+    if (header == null || payload == null) return {'ok': false, 'msg': 'Filtro 1: Estructura incompleta'};
+    if ((header['version'] as num?)?.toInt() != 2) return {'ok': false, 'msg': 'Filtro1: Versión no soportada'};
+
+    final serie = header['serie'] as String? ?? '';
+    final origen = header['origen'] as String? ?? '';
+    final destino = header['destino'] as String? ?? '';
+    final correlativo = (header['correlativo'] as num?)?.toInt() ?? -1;
+    final hashRecibido = header['hash'] as String? ?? '';
+    final hashAnteriorRecibido = header['hash_anterior'] as String? ?? '';
+    final fechaStr = header['fecha_generacion'] as String? ?? '';
+
+    if (serie != '$origen-$destino') return {'ok': false, 'msg': 'Filtro2: Serie no coincide'};
+    final pvUsuario = await db.query('puntos_venta', where: 'id = ?', whereArgs: [idPuntoVentaUsuario]);
+    if (pvUsuario.isEmpty || (pvUsuario.first['codigo'] as String?) != destino) return {'ok': false, 'msg': 'Filtro3: Destino incorrecto'};
+    final pvOrigen = await db.query('puntos_venta', where: 'codigo = ?', whereArgs: [origen]);
+    if (pvOrigen.isEmpty) return {'ok': false, 'msg': 'Filtro4: Origen no existe'};
+
+    final fechaParseada = DateTime.tryParse(fechaStr);
+    if (fechaParseada == null) return {'ok': false, 'msg': 'Filtro5: Fecha inválida'};
+    final ahora = DateTime.now();
+    if (fechaParseada.isAfter(ahora.add(const Duration(minutes: 5))) || ahora.difference(fechaParseada).inHours > 48) {
+      return {'ok': false, 'msg': 'Filtro5: Fecha fuera de rango'};
+    }
+
+    final infoSerie = await getSerieInfo(serie);
+    if (correlativo != infoSerie['ultimo_correlativo'] + 1) return {'ok': false, 'msg': 'Filtro6: Correlativo desordenado'};
+    if (hashAnteriorRecibido != infoSerie['ultimo_hash']) return {'ok': false, 'msg': 'Filtro7: Hash anterior no coincide'};
+
+    final items = (payload['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)).toList();
+    final headerParaHash = Map<String, dynamic>.from(header)..remove('hash');
+    if (calcularHashBatch(headerParaHash, items) != hashRecibido) return {'ok': false, 'msg': 'Filtro8: Hash de integridad falló'};
+
+    for (var item in items) {
+      final prodId = (item['producto_id'] as num?)?.toInt();
+      final cantidad = (item['cantidad'] as num?)?.toInt();
+      if (prodId == null || cantidad == null || cantidad <= 0) return {'ok': false, 'msg': 'Filtro9: Item inválido'};
+      // REM: SIN FILTRO DE ACTIVO PARA PRUEBAS
+      final prodExiste = await db.query('productos', where: 'id = ?', whereArgs: [prodId]);
+      if (prodExiste.isEmpty) return {'ok': false, 'msg': 'Filtro9: Producto no existe'};
+    }
+
+    final fechaHoy = DateTime.now().toIso8601String().split('T')[0];
+    await db.transaction((txn) async {
+      for (var item in items) {
+        final prodId = (item['producto_id'] as num).toInt();
+        final cantidad = (item['cantidad'] as num).toInt();
+        final existeInv = await txn.query('inventario', where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
+        if (existeInv.isEmpty) {
+          await txn.insert('inventario', {'producto_id': prodId, 'punto_venta_id': idPuntoVentaUsuario, 'stock': cantidad, 'fecha': fechaHoy});
+        } else {
+          final stockActual = (existeInv.first['stock'] as num).toInt();
+          await txn.update('inventario', {'stock': stockActual + cantidad}, where: 'producto_id = ? AND punto_venta_id = ? AND fecha = ?', whereArgs: [prodId, idPuntoVentaUsuario, fechaHoy]);
+        }
+      }
+      await txn.update('batches_serie', {'ultimo_correlativo': correlativo, 'ultimo_hash': hashRecibido, 'actualizado_en': DateTime.now().toIso8601String()}, where: 'serie = ?', whereArgs: [serie]);
+      await txn.insert('batches_recibidos', {
+        'tipo': header['tipo'], 'origen': origen, 'destino': destino, 'periodo': fechaHoy, 'secuencial': correlativo,
+        'hash': hashRecibido, 'hash_anterior': hashAnteriorRecibido, 'contenido_json': jsonString,
+        'fecha_generacion': fechaStr, 'fecha_recepcion': DateTime.now().toIso8601String(), 'estado': 'RECIBIDO'
+      });
+
+      // REM: SIN FILTROS - Procesar configuración incluida en el batch automáticamente
+      final config = payload['config'] as Map<String, dynamic>?;
+      if (config != null) {
+        if (config['personal'] != null) {
+          for (var p in config['personal'] as List) {
+            await txn.insert('personal', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        if (config['productos'] != null) {
+          for (var p in config['productos'] as List) {
+            await txn.insert('productos', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        if (config['precios'] != null) {
+          for (var p in config['precios'] as List) {
+            await txn.insert('precios', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        if (config['categorias_producto'] != null) {
+          for (var c in config['categorias_producto'] as List) {
+            await txn.insert('categorias_producto', Map<String, dynamic>.from(c), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        if (config['parametros'] != null) {
+          for (var p in config['parametros'] as List) {
+            await txn.insert('parametros', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        if (config['puntos_venta'] != null) {
+          for (var p in config['puntos_venta'] as List) {
+            await txn.insert('puntos_venta', Map<String, dynamic>.from(p), conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+      }
+    });
+    return {'ok': true, 'msg': 'Batch $serie #$correlativo registrado, ${items.length} productos, config actualizada'};
   }
 }
