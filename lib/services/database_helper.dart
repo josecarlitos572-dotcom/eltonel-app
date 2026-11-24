@@ -393,4 +393,15 @@ Future<Map<String, dynamic>> getResumenMensual() async {
       }
     });
   }
-}
+// REM: FASE 1 - CONSULTA AUTOMÁTICA - Método para obtener el WhatsApp del vendedor activo asignado al PV
+  Future<String?> getWhatsappVendedorActivo(int puntoVentaId) async {
+    final db = await database;
+    final personal = await db.query(
+      'personal',
+      where: 'punto_venta_id = ? AND activo = 1 AND rol = ?',
+      whereArgs: [puntoVentaId, 'VENDEDOR'],
+      limit: 1,
+    );
+    if (personal.isEmpty) return null;
+    return personal.first['fono'] as String?;
+  }}
