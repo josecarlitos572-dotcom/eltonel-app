@@ -1,14 +1,7 @@
-# ============================================================
-# pubspec.yaml — Sistema de Gestión Desayunos El Tonel
-# Modificación: se añade flutter_launcher_icons para regenerar
-# íconos correctos (PNG en mipmap-* y XML adaptativo solo en
-# mipmap-anydpi-v26), eliminando el error AAPT de <adaptive-icon>.
-# ============================================================
-
-name: eltonel_full
-description: Sistema de Gestion Desayunos El Tonel
+name: eltonel_app
+description: Aplicación de gestión para Desayunos El Tonel.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+16
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -16,50 +9,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.6
   sqflite: ^2.3.0
   path: ^1.8.3
-  provider: ^6.1.1
-  url_launcher: ^6.2.2
-  file_picker: ^6.1.1
-  path_provider: ^2.1.1
-  share_plus: ^7.2.1
   crypto: ^3.0.3
-  intl: ^0.19.0
-  mobile_scanner: ^5.1.1
+  intl: ^0.18.1
+  provider: ^6.1.1
+  url_launcher: ^6.2.4  # REM: FASE 1 - Para abrir WhatsApp automáticamente
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
-  # Plugin que genera los íconos de Android con estructura válida
-  flutter_launcher_icons: ^0.13.1
-
-# ============================================================
-# Configuración del generador de íconos
-# ============================================================
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/logo/eltonel_logo.png"
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/logo/eltonel_logo.png"
-  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
-
-  # Ruta de imágenes (crear carpeta assets/logo y colocar el PNG ahí)
-  assets:
-    - assets/logo/
-
-  fonts:
-    - family: CourierNew
-      fonts:
-        - asset: fonts/Courier_New_Regular.ttf
-        - asset: fonts/Courier_New_Bold.ttf
-          weight: 700
-        - asset: fonts/Courier_New_Italic.ttf
-          style: italic
-        - asset: fonts/Courier_New_Bold_Italic.ttf
-          weight: 700
-          style: italic
