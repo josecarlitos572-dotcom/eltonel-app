@@ -21,7 +21,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
   String get _hoy => DateTime.now().toIso8601String().split('T')[0];
 
-  // REM: FASE 1 - CONSULTA AUTOMÁTICA - Eliminado el mapa hardcoded _whatsappMap
+  // REM: SIN FILTROS - Eliminado el mapa hardcoded _whatsappMap
   // Ahora el número se consulta automáticamente desde la BD (tabla personal)
 
   @override
@@ -38,6 +38,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
     super.dispose();
   }
 
+  // REM: SIN FILTROS - Cargar todos los productos y puntos para pruebas
   Future<void> _cargarTodo() async {
     setState(() => _cargando = true);
     final db = Provider.of<DatabaseHelper>(context, listen: false);
@@ -46,8 +47,8 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
     if (mounted) {
       setState(() {
-        _productos = productos.where((p) => (p['activo'] ?? 1) == 1).toList();
-        _puntos = puntos.where((p) => p['id'] != 1).toList();
+        _productos = productos;
+        _puntos = puntos;
         if (_puntos.isNotEmpty) {
           _pvDestinoId = _puntos.first['id'] as int;
         }
@@ -81,8 +82,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
   int get _totalProductos {
     return _cantidades.values.where((ctrl) => (int.tryParse(ctrl.text) ?? 0) > 0).length;
   }
-
-  Future<void> _generarYEnviarBatch() async {
+Future<void> _generarYEnviarBatch() async {
     List<Map<String, dynamic>> carrito = [];
     for (var p in _productos) {
       final id = p['id'] as int;
@@ -114,15 +114,14 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
       final pvCodigo = pvDestino['codigo'] as String;
       final pvNombre = pvDestino['nombre'] as String;
 
-      // REM: FASE 1 - CONSULTA AUTOMÁTICA - Obtener el fono del vendedor activo asignado al PV
-      // REM: FIX - Agregado '!' porque _pvDestinoId ya fue validado como no-nulo arriba
+      // REM: FASE 1 - CONSULTA AUTOMÁTICA - Obtener el fono del vendedor asignado al PV
       final numeroWsp = await db.getWhatsappVendedorActivo(_pvDestinoId!);
       
       if (numeroWsp == null || numeroWsp.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('⚠️ No hay vendedor activo con fono registrado en este PV. Actualiza en Mantenimiento → Personal'),
+              content: Text('⚠️ No hay vendedor con fono registrado en este PV. Actualiza en Mantenimiento → Personal'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -197,8 +196,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
       if (mounted) setState(() => _cargando = false);
     }
   }
-
-  @override
+@override
   Widget build(BuildContext context) {
     if (_cargando) {
       return const Scaffold(
