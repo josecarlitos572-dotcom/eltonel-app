@@ -24,11 +24,11 @@ class _AdminActivarVendedorScreenState extends State<AdminActivarVendedorScreen>
     return DateTime.now().toIso8601String().split('T')[0];
   }
 
+  // REM: SIN FILTROS - Cargar TODO el personal (activo o no)
   Future<void> _cargarTodo() async {
     setState(() => _cargando = true);
     final db = Provider.of<DatabaseHelper>(context, listen: false);
-    final personal = await db.consultar('personal',
-        where: 'activo = 1', orderBy: 'apellidos ASC');
+    final personal = await db.consultar('personal', orderBy: 'apellidos ASC');
     final puntos = await db.getPuntosVenta();
     final asignaciones = await db.consultar('asignaciones_diarias',
         where: 'fecha = ?', whereArgs: [_hoy], orderBy: 'id DESC');
@@ -45,14 +45,8 @@ class _AdminActivarVendedorScreenState extends State<AdminActivarVendedorScreen>
     return _asignacionesHoy.any((a) => a['usuario_id'] == usuarioId && a['estado'] == 'ACTIVO');
   }
 
+  // REM: SIN TRABA - Permitir reactivar incluso si ya está asignado
   Future<void> _activar(Map<String, dynamic> persona) async {
-    if (_yaAsignado(persona['id'] as int)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ya está activo hoy'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
     int? puntoSeleccionado = persona['punto_venta_id'] as int?;
     if (puntoSeleccionado == null || puntoSeleccionado == 0) {
       puntoSeleccionado = _puntos.isNotEmpty ? _puntos.first['id'] as int : null;
@@ -115,6 +109,18 @@ class _AdminActivarVendedorScreenState extends State<AdminActivarVendedorScreen>
       final db = Provider.of<DatabaseHelper>(context, listen: false);
       final ahora = DateTime.now().toIso8601String();
       try {
+        // REM: Si ya existe asignación activa, cerrarla primero
+        final asignacionExistente = _asignacionesHoy.where((a) => 
+            a['usuario_id'] == persona['id'] && a['estado'] == 'ACTIVO').toList();
+        
+        for (var asig in asignacionExistente) {
+          await db.actualizar('asignaciones_diarias', {
+            'id': asig['id'],
+            'estado': 'CERRADO',
+            'hora_fin': ahora,
+          });
+        }
+
         await db.insertar('asignaciones_diarias', {
           'fecha': _hoy,
           'usuario_id': persona['id'],
