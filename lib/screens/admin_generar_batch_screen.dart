@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import '../services/database_helper.dart';
 import '../services/auth_service.dart';
 
@@ -15,12 +14,19 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
   List<Map<String, dynamic>> _productos = [];
   List<Map<String, dynamic>> _puntos = [];
   Map<int, TextEditingController> _cantidades = {};
-  bool _cargando = true;
+  bool _cargando = false;
   String _busqueda = '';
   String _tipo = 'ABASTO';
   int? _pvDestinoId;
 
   String get _hoy => DateTime.now().toIso8601String().split('T')[0];
+
+  // REM: FASE 1 - Números de WhatsApp. Cambia estos por los reales de tus vendedores.
+  final Map<String, String> _whatsappMap = {
+    'SR1': '51988888888', 
+    'VR1': '51977777777', 
+    'VR2': '51966666666', 
+  };
 
   @override
   void initState() {
@@ -80,7 +86,7 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
     return _cantidades.values.where((ctrl) => (int.tryParse(ctrl.text) ?? 0) > 0).length;
   }
 
-  Future<void> _generarBatch() async {
+  Future<void> _generarYEnviarBatch() async {
     List<Map<String, dynamic>> carrito = [];
     for (var p in _productos) {
       final id = p['id'] as int;
@@ -92,138 +98,100 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
     if (carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Asigna cantidad a por lo menos un producto'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Asigna cantidad a por lo menos un producto'), backgroundColor: Colors.orange),
       );
       return;
     }
     if (_pvDestinoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Selecciona un punto de venta'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Selecciona un punto de venta destino'), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    final db = Provider.of<DatabaseHelper>(context, listen: false);
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final db2 = await db.database;
+    setState(() => _cargando = true);
 
-    final pvDestino = _puntos.firstWhere((p) => p['id'] == _pvDestinoId);
-    final pvCodigo = pvDestino['codigo'] as String;
+    try {
+      final db = Provider.of<DatabaseHelper>(context, listen: false);
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final pvDestino = _puntos.firstWhere((p) => p['id'] == _pvDestinoId);
+      final pvCodigo = pvDestino['codigo'] as String;
+      final pvNombre = pvDestino['nombre'] as String;
 
-    final movs = await db2.rawQuery(
-      'SELECT COUNT(*) as total FROM batches_generados WHERE origen = ? AND tipo = ?',
-      ['BASE', _tipo],
-    );
-    final sec = ((movs.first['total'] as int?) ?? 0) + 1;
+      // REM: FASE 1 - Usamos el método oficial del helper (garantiza version: 2 y hash correcto)
+      final jsonStr = await db.generarBatchJson(
+        tipo: _tipo,
+        origenCodigo: 'BASE',
+        destinoCodigo: pvCodigo,
+        dniEmisor: auth.currentUser?['dni'] ?? '09878372',
+        items: carrito,
+      );
 
-    final previos = await db2.query('batches_generados',
-        where: 'origen = ?', whereArgs: ['BASE'], orderBy: 'id DESC', limit: 1);
-    final hashAnterior = previos.isNotEmpty
-        ? (previos.first['hash'] as String? ?? 'sha256:0000')
-        : 'sha256:0000';
+      // REM: FASE 1 - Mensaje legible para WhatsApp
+      final resumenProductos = carrito.map((item) {
+        final prod = _productos.firstWhere((p) => p['id'] == item['producto_id']);
+        return '• ${item['cantidad']} x ${prod['nombre']}';
+      }).join('\n');
 
-    final payload = {'items': carrito};
-    final contenidoPayload = jsonEncode(payload);
-    final hash = 'sha256:${sha256.convert(utf8.encode(contenidoPayload))}';
+      final mensajeWsp = '📦 *BATCH DE $_tipo - EL TONEL*\n'
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+          '📍 Origen: BASE\n'
+          '📍 Destino: $pvCodigo - $pvNombre\n'
+          '📅 Fecha: $_hoy\n'
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+          '📋 *PRODUCTOS:*\n$resumenProductos\n'
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+          '📦 *Total: $_totalProductos productos | $_totalUnidades unidades*\n'
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+          '✅ *Para recibir, abre la app y presiona "Recibir Entrada"*';
 
-    final batch = {
-      'header': {
-        'tipo': _tipo,
-        'version': 1,
-        'origen': 'BASE',
-        'destino': pvCodigo,
-        'fecha_generacion': DateTime.now().toIso8601String(),
-        'periodo': _hoy,
-        'secuencial': sec,
-        'hash_anterior': hashAnterior,
-        'hash': hash,
-      },
-      'payload': payload,
-    };
-
-    final jsonStr = jsonEncode(batch);
-
-    await db2.insert('batches_generados', {
-      'tipo': _tipo,
-      'origen': 'BASE',
-      'destino': pvCodigo,
-      'periodo': _hoy,
-      'secuencial': sec,
-      'hash': hash,
-      'hash_anterior': hashAnterior,
-      'contenido_json': jsonStr,
-      'fecha_generacion': DateTime.now().toIso8601String(),
-      'estado': 'GENERADO',
-    });
-
-    await db2.insert('auditoria_cambios', {
-      'fecha': DateTime.now().toIso8601String(),
-      'usuario_id': auth.currentUser?['id'],
-      'usuario_nombre': auth.currentUser?['nombres'] ?? '',
-      'tabla_afectada': 'batches_generados',
-      'accion': 'BATCH_GENERADO',
-      'registro_id': sec,
-      'datos_anteriores': null,
-      'datos_nuevos': 'Tipo: $_tipo | Destino: $pvCodigo | Items: ${carrito.length}',
-    });
-
-    if (!mounted) return;
-    _mostrarBatch(jsonStr, _tipo, pvCodigo);
-  }
-
-  void _mostrarBatch(String json, String tipo, String destino) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: Text('BATCH $tipo → $destino',
-            style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 13)),
-        content: Container(
-          width: double.maxFinite,
-          height: 400,
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Color(0xFF1A1A1A),
-            border: Border.all(color: Colors.yellow),
-          ),
-          child: SingleChildScrollView(
-            child: SelectableText(
-              json,
-              style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 9),
+      // REM: FASE 1 - Abrir WhatsApp automáticamente
+      final numeroWsp = _whatsappMap[pvCodigo] ?? '';
+      final uri = Uri.parse('https://wa.me/$numeroWsp?text=${Uri.encodeComponent(mensajeWsp)}');
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Batch generado y WhatsApp abierto para $pvNombre'),
+              backgroundColor: Colors.green,
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final Uri url = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(json)}');
-              launchUrl(url);
-            },
-            child: Text('ENVIAR WSP', style: TextStyle(color: Colors.yellow)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                for (var ctrl in _cantidades.values) {
-                  ctrl.clear();
-                }
-              });
-            },
-            child: Text('CERRAR', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+          );
+          for (var ctrl in _cantidades.values) {
+            ctrl.clear();
+          }
+          setState(() {});
+        }
+      } else {
+        await Clipboard.setData(ClipboardData(text: jsonStr));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ WhatsApp no disponible. JSON copiado al portapapeles.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: Text('GENERAR BATCH'), backgroundColor: Colors.black),
-        body: Center(child: CircularProgressIndicator(color: Colors.yellow)),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFFFC107))),
       );
     }
 
@@ -231,33 +199,32 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('CARGA MASIVA (STOCK)'),
+        title: const Text('CARGA MASIVA (STOCK)'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
       body: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(10),
-            color: Color(0xFF1A1A1A),
+            padding: const EdgeInsets.all(10),
+            color: const Color(0xFF1A1A1A),
             child: Column(
               children: [
                 Row(
                   children: [
-                    Text('TIPO: ',
-                        style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontSize: 12)),
-                    SizedBox(width: 8),
+                    const Text('TIPO: ', style: TextStyle(color: Color(0xFFFFC107), fontFamily: 'CourierNew', fontSize: 12)),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _tipo,
                         dropdownColor: Colors.black,
-                        style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
-                        decoration: InputDecoration(
+                        style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
+                        decoration: const InputDecoration(
                           labelText: 'Tipo',
-                          labelStyle: TextStyle(color: Colors.yellow),
+                          labelStyle: TextStyle(color: Color(0xFFFFC107)),
                           isDense: true,
                         ),
-                        items: [
+                        items: const [
                           DropdownMenuItem(value: 'ABASTO', child: Text('ABASTO', style: TextStyle(color: Colors.white))),
                           DropdownMenuItem(value: 'REABASTO', child: Text('REABASTO', style: TextStyle(color: Colors.white))),
                         ],
@@ -266,21 +233,20 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   value: _pvDestinoId,
                   dropdownColor: Colors.black,
-                  style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
-                  decoration: InputDecoration(
+                  style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
+                  decoration: const InputDecoration(
                     labelText: 'Punto de venta destino',
-                    labelStyle: TextStyle(color: Colors.yellow),
+                    labelStyle: TextStyle(color: Color(0xFFFFC107)),
                     isDense: true,
                   ),
                   items: _puntos.map<DropdownMenuItem<int>>((p) {
                     return DropdownMenuItem<int>(
                       value: p['id'] as int,
-                      child: Text('${p['codigo']} - ${p['nombre']}',
-                          style: TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
+                      child: Text('${p['codigo']} - ${p['nombre']}', style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew')),
                     );
                   }).toList(),
                   onChanged: (v) => setState(() => _pvDestinoId = v),
@@ -289,19 +255,19 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             child: TextField(
               onChanged: (v) => setState(() => _busqueda = v),
               decoration: InputDecoration(
                 hintText: 'Buscar producto...',
-                hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
-                prefixIcon: Icon(Icons.search, color: Colors.yellow),
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFFFC107)),
                 filled: true,
-                fillColor: Color(0xFF1A1A1A),
-                border: OutlineInputBorder(),
+                fillColor: const Color(0xFF1A1A1A),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              style: TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
+              style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12),
             ),
           ),
           Expanded(
@@ -311,20 +277,16 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
                 final p = filtrados[i];
                 final id = p['id'] as int;
                 return Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: Colors.white12))
                   ),
                   child: ListTile(
                     dense: true,
                     leading: CircleAvatar(
-                      backgroundColor: Colors.yellow,
-                      child: Text(p['codigo'] ?? '?',
-                          style: TextStyle(
-                              color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                      backgroundColor: const Color(0xFFFFC107),
+                      child: Text(p['codigo'] ?? '?', style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
-                    title: Text(p['nombre'] ?? '',
-                        style: TextStyle(
-                            color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
+                    title: Text(p['nombre'] ?? '', style: const TextStyle(color: Colors.white, fontFamily: 'CourierNew', fontSize: 12)),
                     trailing: SizedBox(
                       width: 80,
                       child: TextField(
@@ -334,19 +296,15 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
                         onChanged: (v) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: '0',
-                          hintStyle: TextStyle(color: Colors.white24),
+                          hintStyle: const TextStyle(color: Colors.white24),
                           filled: true,
                           fillColor: Colors.black,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.yellow),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.yellow, width: 2),
-                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          border: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFC107))),
+                          focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFC107), width: 2)),
                         ),
-                        style: TextStyle(color: Colors.yellow, fontFamily: 'CourierNew', fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Color(0xFFFFC107), fontFamily: 'CourierNew', fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -355,28 +313,24 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
             ),
           ),
           Container(
-            padding: EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
             color: Colors.grey[900],
             child: Column(
               children: [
                 Text(
                   '$_totalProductos productos · $_totalUnidades unidades asignadas',
-                  style: TextStyle(
-                      color: Colors.white70, fontFamily: 'CourierNew', fontSize: 12),
+                  style: const TextStyle(color: Colors.white70, fontFamily: 'CourierNew', fontSize: 12),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 ElevatedButton.icon(
-                  onPressed: _generarBatch,
-                  icon: Icon(Icons.send, color: Colors.black),
-                  label: Text('GENERAR BATCH PARA WSP'),
+                  onPressed: _generarYEnviarBatch,
+                  icon: const Icon(Icons.send, color: Colors.black),
+                  label: const Text('GENERAR Y ENVIAR POR WSP'),
                   style: ElevatedButton.styleFrom(
-                    minimumSize: Size(double.infinity, 50),
-                    backgroundColor: Colors.yellow,
+                    minimumSize: const Size(double.infinity, 50),
+                    backgroundColor: const Color(0xFFFFC107),
                     foregroundColor: Colors.black,
-                    textStyle: TextStyle(
-                        fontFamily: 'CourierNew',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14),
+                    textStyle: const TextStyle(fontFamily: 'CourierNew', fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
               ],
