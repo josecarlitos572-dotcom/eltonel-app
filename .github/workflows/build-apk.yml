@@ -40,19 +40,17 @@ jobs:
       - name: Limpiar proyecto
         run: flutter clean
 
-      # 5. Instalar dependencias
+      # 5. Instalar dependencias (incluye flutter_launcher_icons)
       - name: Instalar Dependencias
         run: flutter pub get
 
       # 6. Generar íconos automáticamente
-      # REM: Comentado temporalmente porque flutter_launcher_icons no está en pubspec.yaml
-      # - name: Generar Íconos de App
-      #   run: dart run flutter_launcher_icons
+      - name: Generar Íconos de App
+        run: dart run flutter_launcher_icons
 
-      # 7. Eliminar archivo de colores duplicado
-      # REM: Comentado porque depende del paso 6 (si no hay íconos, no hay archivo que borrar)
-      # - name: Eliminar Recursos Duplicados
-      #   run: rm -f android/app/src/main/res/values/ic_launcher_colors.xml
+      # 7. Eliminar archivo de colores duplicado generado por el plugin
+      - name: Eliminar Recursos Duplicados
+        run: rm -f android/app/src/main/res/values/ic_launcher_colors.xml
 
       # 8. Compilar APK
       - name: Compilar APK de Producción
