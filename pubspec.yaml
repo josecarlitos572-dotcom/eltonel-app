@@ -32,18 +32,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
-  flutter_launcher_icons: ^0.13.1  # REM: Para generar íconos automáticamente
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   
-  # REM: Assets para el ícono de la app
   assets:
     - assets/
+    - assets/logo/
 
-# REM: Configuración de flutter_launcher_icons
 flutter_launcher_icons:
   android: true
-  ios: false
-  image_path: "assets/icon.png"
+  image_path: "assets/logo/eltonel_logo.png"
   min_sdk_android: 21
