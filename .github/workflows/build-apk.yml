@@ -1,6 +1,5 @@
 # ============================================================
 # build-apk.yml — Workflow de GitHub Actions para El Tonel
-# Genera íconos, elimina recursos duplicados y compila el APK
 # ============================================================
 
 name: Build Flutter APK
@@ -40,7 +39,7 @@ jobs:
       - name: Limpiar proyecto
         run: flutter clean
 
-      # 5. Instalar dependencias (incluye flutter_launcher_icons)
+      # 5. Instalar dependencias
       - name: Instalar Dependencias
         run: flutter pub get
 
@@ -48,7 +47,7 @@ jobs:
       - name: Generar Íconos de App
         run: dart run flutter_launcher_icons
 
-      # 7. Eliminar archivo de colores duplicado generado por el plugin
+      # 7. Eliminar archivo de colores duplicado
       - name: Eliminar Recursos Duplicados
         run: rm -f android/app/src/main/res/values/ic_launcher_colors.xml
 
