@@ -115,7 +115,8 @@ class _AdminGenerarBatchScreenState extends State<AdminGenerarBatchScreen> {
       final pvNombre = pvDestino['nombre'] as String;
 
       // REM: FASE 1 - CONSULTA AUTOMÁTICA - Obtener el fono del vendedor activo asignado al PV
-      final numeroWsp = await db.getWhatsappVendedorActivo(_pvDestinoId);
+      // REM: FIX - Agregado '!' porque _pvDestinoId ya fue validado como no-nulo arriba
+      final numeroWsp = await db.getWhatsappVendedorActivo(_pvDestinoId!);
       
       if (numeroWsp == null || numeroWsp.isEmpty) {
         if (mounted) {
